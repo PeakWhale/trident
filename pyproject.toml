@@ -14,4 +14,5 @@ dependencies = [
     "uvicorn>=0.40.0",
     "langchain-ollama>=1.0.1",
     "litellm>=1.75.3",
+    "pyautogen>=0.2.0,<0.3.0",
 ]

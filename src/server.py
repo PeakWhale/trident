@@ -36,12 +36,23 @@ async def analyze_patient(request: PatientRequest):
         diagnosis = result.get("final_diagnosis", "UNKNOWN")
         plan = result.get("action_plan", "No plan generated")
         
+        # AutoGen QA Review results
+        qa_validated = result.get("qa_validated", False)
+        qa_confidence = result.get("qa_confidence", "N/A")
+        qa_notes = result.get("qa_notes", "")
+        
         return {
             "status": "success",
             "diagnosis": diagnosis,
             "plan": plan,
             "patient_id": request.patient_id,
-            "logs": logs
+            "logs": logs,
+            # AutoGen QA Review
+            "qa_review": {
+                "validated": qa_validated,
+                "confidence": qa_confidence,
+                "notes": qa_notes[:500] if qa_notes else ""
+            }
         }
     except Exception as e:
         error_str = str(e)

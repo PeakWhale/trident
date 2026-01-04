@@ -172,9 +172,9 @@
                         </div>
                     </div>
 
-                    <!-- Layer 4: Action Nodes & Output -->
+                    <!-- Layer 4: Action Nodes -->
                     <div class="arch-layer output-layer">
-                        <div class="layer-label">Action Nodes (Terminal States)</div>
+                        <div class="layer-label">Action Nodes (CrewAI Decision)</div>
                         <div class="layer-content output-content">
                             <div class="arch-block action-block red-action" id="block-action-red">
                                 <div class="block-tag action-tag">Node</div>
@@ -190,6 +190,41 @@
                                 <div class="block-tag action-tag">Node</div>
                                 <div class="block-header">routine</div>
                                 <div class="block-desc">Home care + treatment notes</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Layer 5: AutoGen QA Review -->
+                    <div class="arch-layer qa-layer">
+                        <div class="layer-label">Quality Assurance (AutoGen Validation)</div>
+                        <div class="layer-content qa-content">
+                            <div class="qa-flow-arrow">↓</div>
+                            <div class="node-group qa-group">
+                                <div class="arch-block node-block qa-block" id="block-qa-review">
+                                    <div class="block-tag autogen-tag">AutoGen</div>
+                                    <div class="block-header">qa_review</div>
+                                    <div class="block-desc">Second-opinion validation of triage decision</div>
+                                    <div class="block-status" id="status-qa-review">Pending</div>
+                                </div>
+                                <div class="agents-box autogen-agents">
+                                    <div class="agent-item" id="agent-qa-reviewer">
+                                        <div class="agent-tag autogen-agent-tag">AutoGen + Llama 3.1</div>
+                                        <div class="agent-name">QA Reviewer</div>
+                                        <div class="agent-desc">Checks protocol compliance</div>
+                                    </div>
+                                    <div class="agent-arrow">→</div>
+                                    <div class="agent-item" id="agent-auditor">
+                                        <div class="agent-tag autogen-agent-tag">AutoGen + Llama 3.1</div>
+                                        <div class="agent-name">Clinical Auditor</div>
+                                        <div class="agent-desc">Validates & scores confidence</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="qa-flow-arrow">↓</div>
+                            <div class="arch-block output-block" id="block-output">
+                                <div class="block-tag output-tag">Output</div>
+                                <div class="block-header">Final Decision</div>
+                                <div class="block-desc">Triage level + action plan + QA validation</div>
                             </div>
                         </div>
                     </div>
@@ -274,6 +309,24 @@
                                 Awaiting analysis...
                             </div>
                         </div>
+
+                        <!-- AutoGen QA Review Result -->
+                        <div class="qa-result" id="qa-result">
+                            <div class="qa-header">
+                                <span class="qa-label">AutoGen QA Review</span>
+                                <span class="qa-badge" id="qa-badge">Pending</span>
+                            </div>
+                            <div class="qa-details">
+                                <div class="qa-row">
+                                    <span class="qa-field">Validated:</span>
+                                    <span class="qa-value" id="qa-validated">-</span>
+                                </div>
+                                <div class="qa-row">
+                                    <span class="qa-field">Confidence:</span>
+                                    <span class="qa-value" id="qa-confidence">-</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -283,7 +336,7 @@
         <footer>
             <span class="footer-text">Peakwhale™ Trident v0.1.0</span>
             <span class="footer-divider">|</span>
-            <span class="footer-tech">LangGraph · CrewAI · Llama 3.1 · MCP</span>
+            <span class="footer-tech">LangGraph · CrewAI · AutoGen · Llama 3.1 · MCP</span>
         </footer>
     </div>
 

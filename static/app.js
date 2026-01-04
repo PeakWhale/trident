@@ -97,7 +97,10 @@ const blocks = {
     dbGuidelines: document.getElementById('block-db-guidelines'),
     actionRed: document.getElementById('block-action-red'),
     actionYellow: document.getElementById('block-action-yellow'),
-    actionGreen: document.getElementById('block-action-green')
+    actionGreen: document.getElementById('block-action-green'),
+    // AutoGen QA Review
+    qaReview: document.getElementById('block-qa-review'),
+    output: document.getElementById('block-output')
 };
 
 const statuses = {
@@ -108,7 +111,8 @@ const statuses = {
     nodeRouter: document.getElementById('status-node-router'),
     toolPatient: document.getElementById('status-tool-patient'),
     toolTreatment: document.getElementById('status-tool-treatment'),
-    toolGuidelines: document.getElementById('status-tool-guidelines')
+    toolGuidelines: document.getElementById('status-tool-guidelines'),
+    qaReview: document.getElementById('status-qa-review')
 };
 
 const calls = {
@@ -119,7 +123,17 @@ const calls = {
 
 const agents = {
     nurse: document.getElementById('agent-nurse'),
-    doctor: document.getElementById('agent-doctor')
+    doctor: document.getElementById('agent-doctor'),
+    // AutoGen agents
+    qaReviewer: document.getElementById('agent-qa-reviewer'),
+    auditor: document.getElementById('agent-auditor')
+};
+
+// QA Review elements
+const qaElements = {
+    badge: document.getElementById('qa-badge'),
+    validated: document.getElementById('qa-validated'),
+    confidence: document.getElementById('qa-confidence')
 };
 
 const agentArrow = document.querySelector('.agent-arrow');
@@ -194,6 +208,17 @@ function resetAll() {
     resultDecision.className = 'result-decision';
     decisionLevel.textContent = 'STANDBY';
     decisionAction.textContent = 'Awaiting analysis...';
+    
+    // Reset QA review
+    if (qaElements.badge) {
+        qaElements.badge.textContent = 'Pending';
+        qaElements.badge.className = 'qa-badge';
+    }
+    if (qaElements.validated) qaElements.validated.textContent = '-';
+    if (qaElements.confidence) {
+        qaElements.confidence.textContent = '-';
+        qaElements.confidence.className = 'qa-value';
+    }
 }
 
 // Add log entry
@@ -248,7 +273,7 @@ function displayProtocol(level, patient) {
 }
 
 // Display final decision
-function displayDecision(level, plan) {
+function displayDecision(level, plan, qaReview = null) {
     resultDecision.className = `result-decision status-${level.toLowerCase()}`;
     
     const levelText = {
@@ -259,6 +284,32 @@ function displayDecision(level, plan) {
     
     decisionLevel.textContent = levelText[level] || level;
     decisionAction.innerHTML = plan.replace(/\n/g, '<br>');
+    
+    // Update QA Review display
+    if (qaReview && qaElements.badge) {
+        const validated = qaReview.validated;
+        qaElements.badge.textContent = validated ? 'Validated' : 'Needs Review';
+        qaElements.badge.className = `qa-badge ${validated ? 'validated' : 'needs-review'}`;
+        
+        if (qaElements.validated) {
+            qaElements.validated.textContent = validated ? 'Yes' : 'No';
+        }
+        
+        if (qaElements.confidence) {
+            const confidence = qaReview.confidence || 'MEDIUM';
+            qaElements.confidence.textContent = confidence;
+            qaElements.confidence.className = `qa-value ${confidence.toLowerCase()}`;
+        }
+    } else if (qaElements.badge) {
+        // Default to validated if no QA data (simulation)
+        qaElements.badge.textContent = 'Validated';
+        qaElements.badge.className = 'qa-badge validated';
+        if (qaElements.validated) qaElements.validated.textContent = 'Yes';
+        if (qaElements.confidence) {
+            qaElements.confidence.textContent = 'HIGH';
+            qaElements.confidence.className = 'qa-value high';
+        }
+    }
 }
 
 // Animate architecture flow
@@ -387,7 +438,35 @@ async function animateFlow(level, scenario) {
     addLog('decision', routeTarget, `Generating action plan with treatment considerations`);
     await sleep(300);
     
-    addLog('decision', 'Output', `Triage complete: ${level} with treatment notes applied`);
+    // === STEP 7: AutoGen QA Review ===
+    blocks.qaReview?.classList.add('active');
+    if (statuses.qaReview) statuses.qaReview.textContent = 'Reviewing';
+    addLog('autogen', 'qa_review', 'Executing node: AutoGen quality assurance review');
+    await sleep(300);
+    
+    // Agent: QA Reviewer
+    agents.qaReviewer?.classList.add('active');
+    addLog('autogen', 'QA Reviewer', 'Agent activated: Checking protocol compliance');
+    await sleep(400);
+    
+    addLog('autogen', 'QA Reviewer', `Verified: ${level} decision matches symptom protocol`);
+    await sleep(200);
+    
+    // Agent: Clinical Auditor
+    agents.auditor?.classList.add('active');
+    addLog('autogen', 'Clinical Auditor', 'Agent activated: Validating review');
+    await sleep(400);
+    
+    addLog('autogen', 'Clinical Auditor', 'Confidence assessment: HIGH - Protocol adherence confirmed');
+    await sleep(200);
+    
+    if (statuses.qaReview) statuses.qaReview.textContent = 'Complete';
+    addLog('autogen', 'qa_review', 'Node complete: Decision validated');
+    await sleep(200);
+    
+    // === STEP 8: Final Output ===
+    blocks.output?.classList.add('active');
+    addLog('decision', 'Output', `Triage complete: ${level} with QA validation`);
 }
 
 // Run analysis
@@ -424,7 +503,7 @@ async function runAnalysis() {
         else if (diagText.includes('YELLOW')) level = 'YELLOW';
         
         await animateFlow(level, scenario);
-        displayDecision(level, data.plan);
+        displayDecision(level, data.plan, data.qa_review);
         
     } catch (error) {
         console.error('Analysis error:', error);

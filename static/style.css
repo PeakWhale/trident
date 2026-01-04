@@ -665,6 +665,7 @@ main {
 .log-entry.tool { border-left-color: var(--tag-orange); }
 .log-entry.data { border-left-color: var(--status-green); }
 .log-entry.decision { border-left-color: var(--status-red); }
+.log-entry.autogen { border-left-color: var(--tag-purple); }
 
 .log-time {
     color: var(--text-muted);
@@ -682,6 +683,7 @@ main {
 .log-entry.tool .log-source { color: var(--tag-orange); }
 .log-entry.data .log-source { color: var(--status-green); }
 .log-entry.decision .log-source { color: var(--status-red); }
+.log-entry.autogen .log-source { color: var(--tag-purple); }
 
 .log-message {
     color: var(--text-secondary);
@@ -839,6 +841,129 @@ main {
     font-size: 11px;
     color: var(--text-secondary);
     line-height: 1.5;
+}
+
+/* AutoGen QA Review Result */
+.qa-result {
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-top: 10px;
+    border-left: 3px solid var(--tag-purple);
+}
+
+.qa-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.qa-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--tag-purple);
+}
+
+.qa-badge {
+    font-size: 9px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--bg-primary);
+    color: var(--text-muted);
+}
+
+.qa-badge.validated {
+    background: var(--status-green-dim);
+    color: var(--status-green);
+}
+
+.qa-badge.needs-review {
+    background: var(--status-yellow-dim);
+    color: var(--status-yellow);
+}
+
+.qa-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.qa-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+}
+
+.qa-field {
+    color: var(--text-muted);
+}
+
+.qa-value {
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.qa-value.high { color: var(--status-green); }
+.qa-value.medium { color: var(--status-yellow); }
+.qa-value.low { color: var(--status-red); }
+
+/* AutoGen Architecture Styles */
+.qa-layer {
+    border-top: 1px dashed var(--tag-purple);
+    padding-top: 12px;
+    margin-top: 8px;
+}
+
+.qa-content {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.qa-flow-arrow {
+    color: var(--tag-purple);
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.qa-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.qa-block {
+    border-color: var(--tag-purple) !important;
+}
+
+.autogen-tag {
+    background: var(--tag-purple-dim) !important;
+    color: var(--tag-purple) !important;
+}
+
+.autogen-agents {
+    border-color: var(--tag-purple);
+}
+
+.autogen-agent-tag {
+    background: var(--tag-purple-dim) !important;
+    color: var(--tag-purple) !important;
+}
+
+.output-block {
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-elevated));
+    border: 1px solid var(--accent-blue);
+}
+
+.output-tag {
+    background: var(--accent-blue-dim) !important;
+    color: var(--accent-blue) !important;
 }
 
 /* Footer */

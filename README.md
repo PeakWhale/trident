@@ -21,6 +21,7 @@
   <img src="https://img.shields.io/badge/Python-3.11+-3776ab?style=flat-square&logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/LangGraph-Orchestration-00d4aa?style=flat-square&logo=langchain&logoColor=white" alt="LangGraph" />
   <img src="https://img.shields.io/badge/CrewAI-Multi--Agent-ff6b35?style=flat-square&logo=openai&logoColor=white" alt="CrewAI" />
+  <img src="https://img.shields.io/badge/AutoGen-QA_Review-a855f7?style=flat-square&logo=microsoft&logoColor=white" alt="AutoGen" />
   <img src="https://img.shields.io/badge/FastAPI-API-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Ollama-Llama_3.1-7c3aed?style=flat-square&logo=meta&logoColor=white" alt="Ollama" />
   <img src="https://img.shields.io/badge/MCP-Tools-2563eb?style=flat-square&logo=anthropic&logoColor=white" alt="MCP" />
@@ -30,13 +31,14 @@
 
 ## Overview
 
-**PEAKWHALE™ TRIDENT** is an intelligent medical triage system that combines state-machine orchestration with multi-agent AI collaboration to deliver accurate, protocol-compliant emergency assessments. The system retrieves patient history, analyzes symptoms against clinical protocols, considers treatment contraindications, and outputs actionable triage decisions.
+**PEAKWHALE™ TRIDENT** is an intelligent medical triage system that combines state-machine orchestration with multi-agent AI collaboration to deliver accurate, protocol-compliant emergency assessments. The system demonstrates **multi-framework orchestration** where CrewAI handles primary triage and Microsoft AutoGen provides quality assurance validation.
 
 ### Key Capabilities
 
 - **Protocol-Driven Decisions**: Strict adherence to clinical triage guidelines (RED/YELLOW/GREEN)
 - **Patient History Integration**: Retrieves and analyzes medical history for treatment considerations
 - **Contraindication Awareness**: Flags medication allergies and condition-specific cautions
+- **Multi-Framework AI**: CrewAI for triage + AutoGen for QA validation (two independent agent systems)
 - **Transparent Reasoning**: Full audit trail of agent decisions and tool invocations
 
 ---
@@ -56,12 +58,21 @@ flowchart LR
         E -->|RED| F[emergency]
         E -->|YELLOW| G[urgent]
         E -->|GREEN| H[routine]
+        F --> R[qa_review]
+        G --> R
+        H --> R
     end
 
-    subgraph CrewAI["CrewAI Agents"]
+    subgraph CrewAI["CrewAI Agents (Primary Triage)"]
         D --> I[Triage Nurse]
         I --> J[ER Physician]
         J --> D
+    end
+
+    subgraph AutoGen["AutoGen Agents (QA Validation)"]
+        R --> S[QA Reviewer]
+        S --> T[Clinical Auditor]
+        T --> R
     end
 
     subgraph MCP["MCP Tools"]
@@ -76,9 +87,7 @@ flowchart LR
         M --> P[(Contraindications)]
     end
 
-    F --> Q[Action Plan]
-    G --> Q
-    H --> Q
+    R --> Q[Final Output]
 ```
 
 ---
@@ -88,7 +97,8 @@ flowchart LR
 | Technology | Purpose | Description |
 |------------|---------|-------------|
 | ![LangGraph](https://img.shields.io/badge/LangGraph-00d4aa?style=flat-square&logo=langchain&logoColor=white) | **Orchestration** | State machine for workflow management with conditional routing |
-| ![CrewAI](https://img.shields.io/badge/CrewAI-ff6b35?style=flat-square&logo=openai&logoColor=white) | **Multi-Agent** | Collaborative AI agents (Triage Nurse + ER Physician) |
+| ![CrewAI](https://img.shields.io/badge/CrewAI-ff6b35?style=flat-square&logo=openai&logoColor=white) | **Primary Triage** | Collaborative AI agents (Triage Nurse + ER Physician) |
+| ![AutoGen](https://img.shields.io/badge/AutoGen-a855f7?style=flat-square&logo=microsoft&logoColor=white) | **QA Validation** | Microsoft AutoGen agents (QA Reviewer + Clinical Auditor) |
 | ![MCP](https://img.shields.io/badge/MCP-2563eb?style=flat-square&logo=anthropic&logoColor=white) | **Tool Protocol** | Model Context Protocol for structured tool interactions |
 | ![Ollama](https://img.shields.io/badge/Ollama-7c3aed?style=flat-square&logo=meta&logoColor=white) | **LLM Runtime** | Local Llama 3.1 8B inference |
 | ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white) | **API Layer** | High-performance async web framework |
@@ -173,8 +183,13 @@ curl -X POST http://localhost:8000/analyze \
 {
   "patient_id": "P-101",
   "symptoms": "chest pain and sweating",
-  "final_diagnosis": "RED",
-  "action_plan": "EMERGENCY RESPONSE: Dispatch ambulance immediately (911)\n\n[PENICILLIN ALLERGY]\n  - AVOID: Penicillin, Amoxicillin, Ampicillin\n  - USE INSTEAD: Azithromycin or Fluoroquinolones"
+  "diagnosis": "RED",
+  "plan": "EMERGENCY RESPONSE: Dispatch ambulance immediately (911)\n\n[PENICILLIN ALLERGY]...",
+  "qa_review": {
+    "validated": true,
+    "confidence": "HIGH",
+    "notes": "Protocol adherence confirmed by AutoGen QA agents"
+  }
 }
 ```
 
@@ -190,6 +205,7 @@ trident/
 ├── src/
 │   ├── trident.py          # LangGraph workflow definition
 │   ├── medical_crew.py     # CrewAI agents and tasks
+│   ├── autogen_review.py   # AutoGen QA validation agents
 │   ├── hospital_mcp.py     # MCP tools and databases
 │   ├── llm_manager.py      # Ollama LLM configuration
 │   └── server.py           # FastAPI application
@@ -229,12 +245,29 @@ route_logic → Reads final_diagnosis
               └── GREEN → routine node → "Home Care Instructions"
 ```
 
-### 4. Output Generation
+### 4. Action Node Execution
 ```
-Action Plan = Base Action + Treatment Considerations
-              ├── Medication alternatives (for allergies)
-              ├── Monitoring requirements (for chronic conditions)
-              └── Special precautions (based on history)
+Action nodes → Generate action plan with treatment considerations
+               ├── emergency → "Dispatch Ambulance" + treatment notes
+               ├── urgent → "Urgent Care Referral" + treatment notes
+               └── routine → "Home Care Instructions" + treatment notes
+```
+
+### 5. AutoGen QA Validation
+```
+qa_review node → AutoGen Sequential Process
+                 ├── QA Reviewer (checks protocol compliance)
+                 │   └── Verifies decision matches symptom-protocol rules
+                 └── Clinical Auditor (validates and scores)
+                     └── Outputs: VALIDATED + Confidence (HIGH/MEDIUM/LOW)
+```
+
+### 6. Final Output
+```
+Final Output = Triage Level + Action Plan + QA Validation
+               ├── Diagnosis (RED/YELLOW/GREEN)
+               ├── Action plan with treatment considerations
+               └── QA review status and confidence score
 ```
 
 ---
