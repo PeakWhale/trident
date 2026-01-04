@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peakwhale™ Trident | AI Medical Triage</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="brand">
+                <span class="brand-name">PEAKWHALE<sup>™</sup></span>
+                <span class="brand-divider"></span>
+                <span class="product-name">TRIDENT</span>
+            </div>
+            <div class="header-meta">
+                <span class="header-desc">Autonomous Medical Triage System</span>
+                <div class="system-status">
+                    <span class="status-light"></span>
+                    <span class="status-text">System Online</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Top: Architecture Diagram -->
+            <section class="architecture-section">
+                <div class="section-title">
+                    <h2>System Architecture</h2>
+                    <span class="section-badge">Live Inference Path</span>
+                </div>
+
+                <div class="architecture-diagram">
+                    <!-- Layer 1: Input & Orchestrator -->
+                    <div class="arch-layer">
+                        <div class="layer-label">Entry Point</div>
+                        <div class="layer-content">
+                            <div class="arch-block input-block" id="block-input">
+                                <div class="block-header">Patient Data</div>
+                                <div class="block-desc">ID, symptoms, statement</div>
+                                <div class="block-status" id="status-input">Waiting</div>
+                            </div>
+                            
+                            <div class="flow-arrow">→</div>
+                            
+                            <div class="arch-block orchestrator-block" id="block-orchestrator">
+                                <div class="block-tag">LangGraph</div>
+                                <div class="block-header">Workflow Engine</div>
+                                <div class="block-desc">State machine orchestration</div>
+                                <div class="block-status" id="status-orchestrator">Idle</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Layer 2: LangGraph Nodes -->
+                    <div class="arch-layer nodes-layer">
+                        <div class="layer-label">LangGraph Nodes (State Flow)</div>
+                        <div class="layer-content nodes-content">
+                            <!-- Node 1: Gather Context -->
+                            <div class="node-group">
+                                <div class="arch-block node-block" id="block-node-context">
+                                    <div class="block-tag node-tag">Node 1</div>
+                                    <div class="block-header">gather_context</div>
+                                    <div class="block-desc">Retrieves patient history & treatment rules</div>
+                                    <div class="block-status" id="status-node-context">Pending</div>
+                                </div>
+                                <div class="node-calls">
+                                    <div class="call-item" id="call-patient-record">
+                                        <span class="call-arrow">↓</span>
+                                        <span class="call-name">get_patient_record()</span>
+                                    </div>
+                                    <div class="call-item" id="call-treatment">
+                                        <span class="call-arrow">↓</span>
+                                        <span class="call-name">get_treatment_considerations()</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flow-arrow node-arrow">→</div>
+
+                            <!-- Node 2: Medical Board -->
+                            <div class="node-group medical-board-group">
+                                <div class="arch-block node-block" id="block-node-medical">
+                                    <div class="block-tag node-tag">Node 2</div>
+                                    <div class="block-header">medical_board</div>
+                                    <div class="block-desc">AI agents analyze symptoms</div>
+                                    <div class="block-status" id="status-node-medical">Pending</div>
+                                </div>
+                                <div class="agents-box">
+                                    <div class="agent-item" id="agent-nurse">
+                                        <div class="agent-tag">CrewAI + Llama 3.1</div>
+                                        <div class="agent-name">Triage Nurse</div>
+                                        <div class="agent-desc">Calls tools, gathers data</div>
+                                    </div>
+                                    <div class="agent-arrow">→</div>
+                                    <div class="agent-item" id="agent-doctor">
+                                        <div class="agent-tag">CrewAI + Llama 3.1</div>
+                                        <div class="agent-name">ER Physician</div>
+                                        <div class="agent-desc">Reviews, decides level</div>
+                                    </div>
+                                </div>
+                                <div class="node-calls">
+                                    <div class="call-item" id="call-guidelines">
+                                        <span class="call-arrow">↓</span>
+                                        <span class="call-name">get_triage_guidelines()</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flow-arrow node-arrow">→</div>
+
+                            <!-- Node 3: Router -->
+                            <div class="node-group">
+                                <div class="arch-block node-block router-block" id="block-node-router">
+                                    <div class="block-tag node-tag">Router</div>
+                                    <div class="block-header">route_logic</div>
+                                    <div class="block-desc">Conditional edge based on diagnosis</div>
+                                    <div class="block-status" id="status-node-router">Pending</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Layer 3: MCP Tools & Databases -->
+                    <div class="arch-layer tools-layer">
+                        <div class="layer-label">MCP Tools & Data Layer</div>
+                        <div class="layer-content tools-content">
+                            <div class="tool-group">
+                                <div class="arch-block tool-block" id="block-tool-patient">
+                                    <div class="block-tag tool-tag">MCP Tool</div>
+                                    <div class="block-header">Patient Lookup</div>
+                                    <div class="block-status" id="status-tool-patient">Ready</div>
+                                </div>
+                                <div class="db-arrow">↔</div>
+                                <div class="arch-block db-block" id="block-db-patient">
+                                    <div class="block-tag db-tag">Database</div>
+                                    <div class="block-header">Patient EMR</div>
+                                </div>
+                            </div>
+
+                            <div class="tool-group">
+                                <div class="arch-block tool-block" id="block-tool-treatment">
+                                    <div class="block-tag tool-tag">MCP Tool</div>
+                                    <div class="block-header">Treatment Rules</div>
+                                    <div class="block-status" id="status-tool-treatment">Ready</div>
+                                </div>
+                                <div class="db-arrow">↔</div>
+                                <div class="arch-block db-block" id="block-db-treatment">
+                                    <div class="block-tag db-tag">Database</div>
+                                    <div class="block-header">Contraindications</div>
+                                </div>
+                            </div>
+
+                            <div class="tool-group">
+                                <div class="arch-block tool-block" id="block-tool-guidelines">
+                                    <div class="block-tag tool-tag">MCP Tool</div>
+                                    <div class="block-header">Guideline Search</div>
+                                    <div class="block-status" id="status-tool-guidelines">Ready</div>
+                                </div>
+                                <div class="db-arrow">↔</div>
+                                <div class="arch-block db-block" id="block-db-guidelines">
+                                    <div class="block-tag db-tag">Database</div>
+                                    <div class="block-header">Triage Protocols</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Layer 4: Action Nodes & Output -->
+                    <div class="arch-layer output-layer">
+                        <div class="layer-label">Action Nodes (Terminal States)</div>
+                        <div class="layer-content output-content">
+                            <div class="arch-block action-block red-action" id="block-action-red">
+                                <div class="block-tag action-tag">Node</div>
+                                <div class="block-header">emergency</div>
+                                <div class="block-desc">Dispatch ambulance + treatment notes</div>
+                            </div>
+                            <div class="arch-block action-block yellow-action" id="block-action-yellow">
+                                <div class="block-tag action-tag">Node</div>
+                                <div class="block-header">urgent</div>
+                                <div class="block-desc">Urgent care + treatment notes</div>
+                            </div>
+                            <div class="arch-block action-block green-action" id="block-action-green">
+                                <div class="block-tag action-tag">Node</div>
+                                <div class="block-header">routine</div>
+                                <div class="block-desc">Home care + treatment notes</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bottom: Control & Results -->
+            <section class="control-section">
+                <!-- Left: Input Controls -->
+                <div class="panel input-panel">
+                    <div class="panel-header">
+                        <h3>Patient Case Input</h3>
+                    </div>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>Clinical Scenario</label>
+                            <select id="scenario-select">
+                                <option value="cardiac">Acute Cardiac Event (Expected: RED)</option>
+                                <option value="respiratory">Respiratory Distress (Expected: YELLOW)</option>
+                                <option value="dermatology">Dermatological Issue (Expected: GREEN)</option>
+                            </select>
+                        </div>
+
+                        <div class="patient-card">
+                            <div class="patient-row">
+                                <span class="patient-label">Patient ID</span>
+                                <span class="patient-value" id="display-patient-id">P-101</span>
+                            </div>
+                            <div class="patient-row">
+                                <span class="patient-label">Name</span>
+                                <span class="patient-value" id="display-patient-name">Sarah Connor</span>
+                            </div>
+                            <div class="patient-row">
+                                <span class="patient-label">Medical History</span>
+                                <span class="patient-value" id="display-patient-history">Hypertension, Penicillin Allergy</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Patient Statement</label>
+                            <div class="statement-box" id="symptoms-text">
+                                Select a scenario to view patient statement...
+                            </div>
+                        </div>
+
+                        <button id="analyze-btn" class="primary-btn">
+                            Run Triage Analysis
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Center: Execution Log -->
+                <div class="panel log-panel">
+                    <div class="panel-header">
+                        <h3>Execution Log</h3>
+                        <span class="log-badge" id="log-count">0 events</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="log-container" id="log-container">
+                            <div class="log-empty">
+                                Execution trace will appear here when analysis runs.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Results -->
+                <div class="panel results-panel">
+                    <div class="panel-header">
+                        <h3>Triage Result</h3>
+                    </div>
+                    <div class="panel-content">
+                        <div class="result-protocol" id="result-protocol">
+                            <div class="protocol-empty">
+                                Protocol match will display after analysis.
+                            </div>
+                        </div>
+
+                        <div class="result-decision" id="result-decision">
+                            <div class="decision-level" id="decision-level">STANDBY</div>
+                            <div class="decision-action" id="decision-action">
+                                Awaiting analysis...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <span class="footer-text">Peakwhale™ Trident v0.1.0</span>
+            <span class="footer-divider">|</span>
+            <span class="footer-tech">LangGraph · CrewAI · Llama 3.1 · MCP</span>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
