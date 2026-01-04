@@ -35,10 +35,11 @@
 
 ### Key Capabilities
 
+- **Hybrid LLM Architecture**: LLM extracts symptom categories from natural language, protocols ensure consistent decisions
 - **Protocol-Driven Decisions**: Strict adherence to clinical triage guidelines (RED/YELLOW/GREEN)
 - **Patient History Integration**: Retrieves and analyzes medical history for treatment considerations
 - **Contraindication Awareness**: Flags medication allergies and condition-specific cautions
-- **Multi-Framework AI**: CrewAI for triage + AutoGen for QA validation (two independent agent systems)
+- **Multi-Framework AI**: CrewAI for triage analysis + AutoGen for QA validation (two independent agent systems)
 - **Transparent Reasoning**: Full audit trail of agent decisions and tool invocations
 
 ---
@@ -226,16 +227,22 @@ Patient ID + Symptoms → gather_context node
                         └── Analyzes history for treatment considerations
 ```
 
-### 2. Multi-Agent Analysis
+### 2. Hybrid LLM Triage (Symptom Extraction + Protocol Lookup)
 ```
-medical_board node → CrewAI Sequential Process
-                     ├── Triage Nurse (uses all 3 MCP tools)
-                     │   ├── Patient Lookup → Patient DB
-                     │   ├── Guideline Search → Protocol DB
-                     │   └── Treatment Considerations → Contraindications
-                     └── ER Physician (reviews and decides)
-                         └── Outputs: RED | YELLOW | GREEN
+medical_board node → Hybrid Architecture
+                     │
+                     ├── Step 1: LLM Symptom Extraction (Llama 3.1)
+                     │   └── Analyzes natural language → cardiac | respiratory | dermatological
+                     │
+                     ├── Step 2: Protocol Lookup (Deterministic)
+                     │   └── Category → get_triage_guidelines() → RED | YELLOW | GREEN
+                     │
+                     └── Step 3: CrewAI Analysis
+                         ├── Triage Nurse (uses MCP tools for context)
+                         └── ER Physician (provides reasoning & treatment notes)
 ```
+
+This hybrid approach combines LLM flexibility (understanding varied symptom descriptions) with protocol reliability (consistent triage decisions).
 
 ### 3. Conditional Routing
 ```

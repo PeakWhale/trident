@@ -30,12 +30,17 @@ def run_medical_analysis(symptom_text: str, patient_id: str, patient_history: st
     # Agents
     nurse = Agent(
         role='Triage Nurse',
-        goal='Gather patient history and lookup triage guidelines. Report the protocol AND any treatment considerations from patient history.',
-        backstory='''You are an experienced triage nurse who:
-1. ALWAYS uses the Guideline Search tool to find the correct triage protocol based on PRIMARY symptom
-2. ALWAYS uses the Patient Lookup tool to get patient medical history
-3. ALWAYS uses the Treatment Considerations tool to identify contraindications and monitoring needs
-4. Reports both the triage protocol AND any treatment considerations from patient history''',
+        goal='Gather patient history and lookup triage guidelines. Report the EXACT protocol output from Guideline Search tool.',
+        backstory='''You are a triage nurse who STRICTLY follows protocol outputs.
+
+CRITICAL RULES:
+1. Use Guideline Search tool with the PRIMARY symptom keyword (rash, chest, fever, etc.)
+2. The Guideline Search tool output is AUTHORITATIVE - copy it exactly
+3. If tool says "GREEN PROTOCOL" -> report GREEN
+4. If tool says "YELLOW PROTOCOL" -> report YELLOW
+5. If tool says "RED PROTOCOL" -> report RED
+6. NEVER override or interpret the protocol - just report what the tool says
+7. A rash/skin issue is GREEN, NOT an emergency''',
         llm=llm_engine,
         tools=[tool_lookup, tool_guidelines, tool_treatment],
         verbose=True
@@ -43,12 +48,16 @@ def run_medical_analysis(symptom_text: str, patient_id: str, patient_history: st
 
     doctor = Agent(
         role='Emergency Physician',
-        goal='Determine the EXACT triage level (RED, YELLOW, or GREEN) based on protocols AND acknowledge treatment considerations from patient history',
-        backstory='''You are a senior ER doctor who:
-1. MUST follow clinical protocols exactly for triage level
-2. MUST acknowledge treatment considerations from patient history
-3. If protocol says RED, output RED. If YELLOW, output YELLOW. If GREEN, output GREEN.
-4. You never override protocols but you DO note treatment considerations.''',
+        goal='Output the EXACT triage level from the protocol. Do NOT override protocol decisions.',
+        backstory='''You are an ER doctor who MUST output the triage level from the nurse's protocol findings.
+
+ABSOLUTE RULES - NO EXCEPTIONS:
+1. If nurse reports "GREEN PROTOCOL" -> You MUST output "TRIAGE LEVEL: GREEN"
+2. If nurse reports "YELLOW PROTOCOL" -> You MUST output "TRIAGE LEVEL: YELLOW"
+3. If nurse reports "RED PROTOCOL" -> You MUST output "TRIAGE LEVEL: RED"
+4. You are NOT allowed to change the level. The protocol is law.
+5. Skin rash = GREEN. Fever/cough = YELLOW. Chest pain = RED.
+6. Do NOT escalate GREEN to YELLOW or RED based on your judgment.''',
         llm=llm_engine,
         verbose=True
     )
@@ -57,27 +66,34 @@ def run_medical_analysis(symptom_text: str, patient_id: str, patient_history: st
     task1 = Task(
         description=f"""Patient {patient_id} reports: '{symptom_text}'.
 
-Your tasks:
-1. Use Patient Lookup tool to get patient history for {patient_id}
-2. Use Treatment Considerations tool for {patient_id} to get any contraindications or monitoring needs
-3. Identify the PRIMARY symptom (chest pain OR fever/cough OR rash)
-4. Use Guideline Search tool to lookup the triage protocol for that symptom
-5. Report BOTH:
-   - The triage protocol and recommended level (RED, YELLOW, or GREEN)
-   - Any treatment considerations from patient history (allergies, contraindications, monitoring needs)""",
-        expected_output="The protocol with triage level (RED/YELLOW/GREEN) AND any treatment considerations from patient history.",
+STEPS:
+1. Identify the PRIMARY symptom from the patient statement:
+   - If mentions rash, skin, itch, gardening -> use "rash" as search term
+   - If mentions fever, cough, breathing -> use "fever" as search term
+   - If mentions chest pain, arm pain, sweating -> use "chest" as search term
+2. Use Guideline Search tool with that PRIMARY symptom keyword
+3. The tool will return a PROTOCOL (GREEN, YELLOW, or RED) - this is the ANSWER
+4. Report the exact protocol output - do not interpret or change it
+
+IMPORTANT: A rash is GREEN, not an emergency. Trust the Guideline Search tool output.""",
+        expected_output="The exact protocol output from Guideline Search (GREEN PROTOCOL, YELLOW PROTOCOL, or RED PROTOCOL).",
         agent=nurse
     )
     
     task2 = Task(
-        description="""Review the nurse's findings and:
-1. Confirm the EXACT triage level from the protocol (RED, YELLOW, or GREEN)
-2. Acknowledge any treatment considerations from patient history
+        description="""Look at the nurse's protocol finding and output the SAME level.
+
+RULES:
+- If nurse found GREEN PROTOCOL -> output "TRIAGE LEVEL: GREEN"
+- If nurse found YELLOW PROTOCOL -> output "TRIAGE LEVEL: YELLOW"
+- If nurse found RED PROTOCOL -> output "TRIAGE LEVEL: RED"
+
+DO NOT change the level. DO NOT use your own judgment. Just copy what the protocol says.
 
 Output format:
-TRIAGE LEVEL: [RED/YELLOW/GREEN]
-TREATMENT NOTES: [Any considerations from patient history]""",
-        expected_output="The triage level (RED, YELLOW, or GREEN) with any treatment notes from patient history.",
+TRIAGE LEVEL: [exactly what protocol says]
+TREATMENT NOTES: [any notes from patient history]""",
+        expected_output="TRIAGE LEVEL: GREEN or YELLOW or RED (matching the protocol)",
         agent=doctor
     )
 

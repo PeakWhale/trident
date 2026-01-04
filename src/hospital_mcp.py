@@ -86,16 +86,16 @@ def get_triage_guidelines(symptom: str) -> str:
     s = symptom.lower()
     
     # RED is ONLY for cardiac emergencies - chest + sweating/arm pain
-    if "chest" in s or "cardiac" in s or "heart" in s or "arm pain" in s or "sweating" in s:
+    if "chest" in s or "cardiac" in s or "heart" in s or "arm pain" in s or "sweating" in s or "diaphoresis" in s or "crushing" in s or "radiating" in s:
         return "RED PROTOCOL: Chest pain with sweating or arm pain = RED EMERGENCY. Output: RED"
     
     # YELLOW is for respiratory/fever - NOT RED
     if "fever" in s or "cough" in s or "spo2" in s or "respiratory" in s or "breath" in s:
         return "YELLOW PROTOCOL: Fever/Cough/Low SPO2 WITHOUT chest pain = YELLOW URGENT (not RED). Output: YELLOW"
     
-    # GREEN is for skin/minor issues  
-    if "rash" in s or "itch" in s or "skin" in s or "gardening" in s or "allergy" in s:
-        return "GREEN PROTOCOL: Localized rash with no systemic symptoms = GREEN ROUTINE. Output: GREEN"
+    # GREEN is for skin/minor issues
+    if "rash" in s or "itch" in s or "skin" in s or "gardening" in s or "allergy" in s or "dermat" in s:
+        return "GREEN PROTOCOL: Localized rash/dermatological issue with no systemic symptoms = GREEN ROUTINE. Output: GREEN"
     
     return "PROTOCOL: Assess symptom severity and choose appropriate level."
 
