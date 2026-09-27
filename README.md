@@ -1,3 +1,5 @@
+<p align="center"><img src="trident.svg" width="64" height="64" alt="Trident logo"></p>
+
 <p align="center">
   <img src="https://img.shields.io/badge/PEAKWHALE™-TRIDENT-0066cc?style=for-the-badge&labelColor=001a33" alt="PEAKWHALE™ TRIDENT" />
 </p>
