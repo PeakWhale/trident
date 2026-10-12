@@ -105,6 +105,7 @@ def create_app(engine: TriageEngine | None = None, allowed_hosts: Iterable[str] 
             "packs": eng.packs.ids(),
             "models": eng.model_names,
             "max_input_chars": eng.max_input_chars,
+            "audit_log": eng.audit is not None,
         }
 
     @app.get("/api/packs")

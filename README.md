@@ -121,7 +121,8 @@ uv run trident serve
 ```
 
 Open http://localhost:8000. Pick a rule pack, pick an example case (or type your own text) and click **Run Triage**.
-The diagram lights up with the real steps, and the log shows the real timings.
+The diagram then replays the real steps from the server's answer, and the log shows when each step really
+started and how long it took (the replay itself is slowed down so you can follow it).
 
 No Ollama running? The app still starts. Every case then shows NEEDS HUMAN REVIEW, because the model can not
 answer. That is the fail-safe at work.

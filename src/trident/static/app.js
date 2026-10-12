@@ -48,6 +48,7 @@ const state = {
     startTime: null,
     // From /api/health. Text over this limit is not cut: the server sends it to human review.
     maxInputChars: null,
+    auditLog: false,
 };
 
 // ---------- small helpers ----------
@@ -76,6 +77,10 @@ function getTimestamp() {
     return ((Date.now() - state.startTime) / 1000).toFixed(2) + 's';
 }
 
+function seconds(ms) {
+    return (Math.max(0, ms) / 1000).toFixed(2) + 's';
+}
+
 function savePackChoice(id) {
     try { localStorage.setItem(STORAGE_KEY, id); } catch (e) { /* storage may be blocked */ }
 }
@@ -86,13 +91,14 @@ function loadPackChoice() {
 
 // ---------- log ----------
 
-function addLog(type, source, message) {
+// time: the time to show. Default: real time since the run started.
+function addLog(type, source, message, time) {
     if (ui.logContainer.querySelector('.log-empty')) {
         ui.logContainer.replaceChildren();
     }
     const entry = make('div', `log-entry ${type}`);
     entry.append(
-        make('span', 'log-time', getTimestamp()),
+        make('span', 'log-time', time || getTimestamp()),
         make('span', 'log-source', source),
         make('span', 'log-message', message),
     );
@@ -125,6 +131,7 @@ async function loadHealth() {
         $('agent-classifier-model').textContent = data.models.classifier;
         $('agent-reviewer-model').textContent = data.models.reviewer;
         state.maxInputChars = Number.isInteger(data.max_input_chars) ? data.max_input_chars : null;
+        state.auditLog = data.audit_log === true;
         updateCharCount();
     } catch (error) {
         ui.statusText.textContent = 'Server offline';
@@ -278,16 +285,20 @@ function activateTool(name, status) {
     $(`status-tool-${name}`).textContent = status;
 }
 
+// Replays the steps from the server's answer. The pauses are only for the
+// animation: the log shows each step's real start time and duration.
 async function animateSteps(result) {
     const flowArrows = document.querySelectorAll('.flow-arrow');
+    const runStart = Date.parse(result.created_at);
+    const at = (iso, extraMs = 0) => seconds(Date.parse(iso) - runStart + extraMs);
     activate('block-input');
     $('status-input').textContent = 'Received';
-    addLog('data', 'Input', `${result.input_text.length} characters, rule pack "${result.pack}" v${result.pack_version}`);
+    addLog('data', 'Input', `${result.input_text.length} characters, rule pack "${result.pack}" v${result.pack_version}`, seconds(0));
     await sleep(150);
     flowArrows[0]?.classList.add('active');
     activate('block-orchestrator');
     $('status-orchestrator').textContent = 'Running';
-    addLog('orchestrator', 'LangGraph', `Workflow started (request ${result.request_id.slice(0, 8)})`);
+    addLog('orchestrator', 'LangGraph', `Workflow started (request ${result.request_id.slice(0, 8)})`, seconds(0));
     await sleep(150);
 
     const ran = new Set();
@@ -313,13 +324,14 @@ async function animateSteps(result) {
         }
         if (step.name === 'review' && step.status !== 'skipped') activate('agent-reviewer');
 
-        addLog(STEP_LOG_TYPE[step.status] || 'node', step.name, step.detail || STEP_STATUS_TEXT[step.status]);
+        addLog(STEP_LOG_TYPE[step.status] || 'node', step.name, step.detail || STEP_STATUS_TEXT[step.status], at(step.started_at));
         for (const attempt of step.data.attempts || []) {
             const who = step.name === 'classify' ? 'Classifier' : 'Reviewer';
+            const when = at(step.started_at, step.duration_ms);
             if (attempt.error) {
-                addLog('warn', who, `Try ${attempt.attempt}: ${attempt.error}`);
+                addLog('warn', who, `Try ${attempt.attempt}: ${attempt.error}`, when);
             } else {
-                addLog('agent', who, `Try ${attempt.attempt}: valid JSON (${attempt.ms} ms)`);
+                addLog('agent', who, `Try ${attempt.attempt}: valid JSON (${attempt.ms} ms)`, when);
             }
         }
         await sleep(200);
@@ -329,7 +341,14 @@ async function animateSteps(result) {
         $(`status-node-${name}`).textContent = 'Not run';
     });
 
-    activateTool('audit', 'Recorded');
+    if (state.auditLog) {
+        activateTool('audit', 'Recorded');
+    } else {
+        // The audit trail is in the result. No JSONL file is written (TRIDENT_AUDIT_LOG is not set).
+        activate('group-audit');
+        activate('block-tool-audit');
+        $('status-tool-audit').textContent = 'In result only';
+    }
     if (result.needs_human_review) {
         activate('block-level-human-review');
         activate(`block-level-${result.level}`, 'interim');
@@ -344,6 +363,7 @@ async function animateSteps(result) {
         result.needs_human_review
             ? `NEEDS HUMAN REVIEW (treat as ${result.level} while waiting) · total ${result.timing_ms.total} ms`
             : `${result.level} decided · total ${result.timing_ms.total} ms`,
+        seconds(result.timing_ms.total),
     );
 }
 
@@ -466,7 +486,7 @@ async function runAnalysis() {
     state.startTime = Date.now();
     ui.decisionLevel.textContent = 'ANALYZING...';
     ui.decisionAction.textContent = 'Processing through workflow...';
-    addLog('orchestrator', 'Client', `POST /api/triage (pack: ${state.pack.id})`);
+    addLog('orchestrator', 'Client', `POST /api/triage (pack: ${state.pack.id})`, seconds(0));
 
     try {
         const res = await fetch('/api/triage', {
