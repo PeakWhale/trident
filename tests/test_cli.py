@@ -58,7 +58,7 @@ def test_triage_command_unknown_pack(registry, monkeypatch, capsys):
     ("env", "argv", "message"),
     [
         ({"TRIDENT_PACKS_DIR": "/nonexistent-trident-packs"}, ["packs"], "rule pack folder does not exist"),
-        ({"TRIDENT_PACKS_DIR": "/nonexistent-trident-packs"}, ["triage", "--pack", "it-incidents", "hello"], "does not exist"),
+        ({"TRIDENT_PACKS_DIR": "/nonexistent-trident-packs"}, ["triage", "--pack", "it-incidents", "hi"], "not exist"),
         ({"TRIDENT_PACKS_DIR": "/nonexistent-trident-packs"}, ["validate"], "does not exist"),
         ({"TRIDENT_LLM_TIMEOUT": "abc"}, ["validate"], "TRIDENT_LLM_TIMEOUT must be a number"),
         ({"TRIDENT_LLM_PROVIDER": "anthropic"}, ["triage", "--pack", "it-incidents", "hi"], "TRIDENT_LLM_PROVIDER"),

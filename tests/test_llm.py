@@ -8,8 +8,7 @@ import httpx
 import pytest
 
 from trident.config import Settings
-# Kept before the autouse fixture in conftest.py swaps it for a no-op.
-from trident.config import load_dotenv_if_present as REAL_LOAD_DOTENV
+from trident.config import load_dotenv_if_present as REAL_LOAD_DOTENV  # kept before conftest swaps it for a no-op
 from trident.engine import TriageEngine
 from trident.llm import LLMError, OllamaClient, OpenAICompatibleClient, client_from_settings, redact
 
@@ -96,7 +95,9 @@ def test_url_password_never_reaches_the_result(make_engine, provider, status, bo
     """httpx puts the full URL, with user:password, into its error messages."""
     mock, seen = transport(lambda r: httpx.Response(status, json=body) if body else httpx.Response(status))
     if provider == "openai":
-        client = OpenAICompatibleClient(model="m", base_url=SECRET_URLS[provider], api_key="sk-secret-key", transport=mock)
+        client = OpenAICompatibleClient(
+            model="m", base_url=SECRET_URLS[provider], api_key="sk-secret-key", transport=mock
+        )
     else:
         client = OllamaClient(model="llama3.1:8b", base_url=SECRET_URLS[provider], transport=mock)
     result = make_engine(client, client).triage("The checkout page returns HTTP 503.", "it-incidents")

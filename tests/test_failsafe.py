@@ -196,7 +196,8 @@ def test_category_min_confidence_can_only_be_stricter(make_engine, registry):
 
     loose = parse_pack(pack_with(escalation__min_confidence=0.7, categories__1__min_confidence=0.1))
     strict = parse_pack(pack_with(escalation__min_confidence=0.7, categories__1__min_confidence=0.9))
-    for test_pack, confidence, outcome in [(loose, 0.15, HUMAN_REVIEW), (loose, 0.7, DECIDED), (strict, 0.8, HUMAN_REVIEW)]:
+    cases = [(loose, 0.15, HUMAN_REVIEW), (loose, 0.7, DECIDED), (strict, 0.8, HUMAN_REVIEW)]
+    for test_pack, confidence, outcome in cases:
         engine = make_engine(
             FakeLLM(classified("question", confidence, ["How do I"])),
             FakeLLM(agree("question")),
@@ -259,13 +260,15 @@ def test_reviewer_agrees_but_names_a_more_urgent_category(make_engine, pack):
 @pytest.mark.parametrize(
     ("pack_id", "text", "answer", "review_category", "level"),
     [
-        ("medical-demo", "I have a small itchy rash on my arm.", classified("skin_minor", 0.9, ["itchy rash"]), "cardiac", "RED"),
+        ("medical-demo", "An itchy rash on my arm.", classified("skin_minor", 0.9, ["itchy rash"]), "cardiac", "RED"),
         ("it-incidents", LOW_TEXT, LOW_OK, "security_incident", "P1"),
         ("it-incidents", LOW_TEXT, LOW_OK, "degraded_performance", "P2"),
         ("it-incidents", LOW_TEXT, LOW_OK, "unknown", "P2"),
     ],
 )
-def test_reviewer_category_raises_the_treat_as_level(make_engine, registry, pack_id, text, answer, review_category, level):
+def test_reviewer_category_raises_the_treat_as_level(
+    make_engine, registry, pack_id, text, answer, review_category, level
+):
     pack = registry.get(pack_id)
     engine = make_engine(FakeLLM(answer), FakeLLM(disagree(review_category)))
     result = engine.triage(text, pack_id)

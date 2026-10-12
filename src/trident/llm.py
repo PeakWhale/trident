@@ -58,7 +58,8 @@ def _post(http: httpx.Client, path: str, payload: dict[str, Any], secrets: tuple
     except httpx.TimeoutException as exc:
         raise LLMError(f"the model endpoint timed out ({type(exc).__name__})") from None
     except httpx.RequestError as exc:
-        raise LLMError(f"could not reach the model endpoint: {redact(f'{type(exc).__name__}: {exc}', secrets)}") from None
+        detail = redact(f"{type(exc).__name__}: {exc}", secrets)
+        raise LLMError(f"could not reach the model endpoint: {detail}") from None
     if response.is_error:
         detail = redact(_error_detail(response), secrets)
         message = f"the model endpoint returned HTTP {response.status_code} {response.reason_phrase}".rstrip()

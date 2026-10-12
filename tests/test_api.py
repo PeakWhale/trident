@@ -160,7 +160,9 @@ def test_allowed_hosts_setting(make_engine, monkeypatch):
     assert any_host.get("/api/health", headers={"Host": "anything.example"}).status_code == 200
 
 
-@pytest.mark.parametrize("content_type", [None, "text/plain", "application/x-www-form-urlencoded", "multipart/form-data"])
+@pytest.mark.parametrize(
+    "content_type", [None, "text/plain", "application/x-www-form-urlencoded", "multipart/form-data"]
+)
 def test_triage_needs_a_json_content_type(client_for, content_type):
     import json
 
