@@ -5,7 +5,8 @@ A small LangGraph state machine:
     validate_input -> screen_rules -> classify -> apply_rules -> review -> decide
 
 * validate_input  checks the text is not empty and not too long.
-* screen_rules    runs the pack's red-flag word rules (no AI).
+* screen_rules    runs the pack's red-flag word rules (no AI). This step also
+                  runs for text that is too long, so a red flag still counts.
 * classify        asks the LLM for {category, confidence, evidence} as JSON,
                   checks it against a schema, and retries once if it is invalid.
 * apply_rules     maps the category to a level with the pack's rules (no AI).
@@ -65,6 +66,8 @@ class _State(TypedDict, total=False):
     steps: Annotated[list[dict[str, Any]], operator.add]
     reasons: Annotated[list[str], operator.add]
     halt: bool
+    # The text can be screened by the word rules, but must not go to a model.
+    skip_llm: bool
     rule_hits: list[dict[str, Any]]
     min_level: str | None
     classification: dict[str, Any] | None
@@ -234,9 +237,10 @@ class TriageEngine:
         graph.add_edge(START, order[0])
         for current, following in zip(order[:-2], order[1:-1], strict=True):
             # After a fatal problem, jump straight to the fail-safe gate.
+            # Text that is too long still goes through screen_rules (no AI) first.
             graph.add_conditional_edges(
                 current,
-                _route_to(following),
+                _route_to(following, stop_on_skip_llm=current != "validate_input"),
                 {following: following, "decide": "decide"},
             )
         graph.add_edge("review", "decide")
@@ -287,8 +291,9 @@ class TriageEngine:
             reason = "The input text is empty." if isinstance(text, str) else "The input is not text."
             return _NodeResult({"halt": True, "reasons": [reason]}, "escalated", reason)
         if len(text) > self.max_input_chars:
+            # Do not send it to a model, but still run the word rules on all of it.
             reason = f"The input text is too long ({len(text)} characters, the limit is {self.max_input_chars})."
-            return _NodeResult({"halt": True, "reasons": [reason]}, "escalated", reason)
+            return _NodeResult({"skip_llm": True, "reasons": [reason]}, "escalated", reason)
         return _NodeResult({}, "ok", f"{len(text)} characters.")
 
     def _screen_rules(self, state: dict[str, Any]) -> _NodeResult:
@@ -561,9 +566,11 @@ class TriageEngine:
         )
 
 
-def _route_to(following: str):
+def _route_to(following: str, stop_on_skip_llm: bool = True):
     def route(state: dict[str, Any]) -> str:
-        return "decide" if state.get("halt") else following
+        if state.get("halt") or (stop_on_skip_llm and state.get("skip_llm")):
+            return "decide"
+        return following
 
     return route
 
@@ -579,7 +586,7 @@ def gate_checks(state: dict[str, Any]) -> dict[str, bool]:
         "confidence_ok": state.get("confidence_ok") is True,
         "level_set": bool(state.get("final_level")),
         "reviewer_agrees": review.get("agrees") is True and review.get("category") == category,
-        "no_escalation": not state.get("reasons") and not state.get("halt"),
+        "no_escalation": not state.get("reasons") and not state.get("halt") and not state.get("skip_llm"),
     }
 
 

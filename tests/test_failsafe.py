@@ -342,6 +342,36 @@ def test_too_long_input_needs_human_review(make_engine, pack):
     assert_human_review(result, pack)
     assert "too long" in result.reasons[0]
     assert classifier.calls == []
+    assert [s.name for s in result.steps] == ["validate_input", "screen_rules", "decide"]
+
+
+@pytest.mark.parametrize(
+    ("pack_id", "text", "level", "rules"),
+    [
+        (
+            "it-incidents",
+            "Ransomware note on every file server, all users locked out.",
+            "P1",
+            ["security-words", "wide-impact-words"],
+        ),
+        ("medical-demo", "My father is unconscious and not breathing.", "RED", ["life-threat-words"]),
+        ("customer-support", "You charged me twice. My lawyer will contact you.", "urgent", ["legal-words"]),
+    ],
+)
+def test_too_long_input_still_runs_the_word_rules(make_engine, registry, pack_id, text, level, rules):
+    """A red flag counts even when pasted logs make the text too long."""
+    pack = registry.get(pack_id)
+    classifier, reviewer = FakeLLM(), FakeLLM()
+    engine = make_engine(classifier, reviewer, max_input_chars=8000)
+    long_text = text + "\n" + "2026-10-12T10:00:00Z INFO worker heartbeat ok\n" * 200
+    assert len(long_text) > 8000
+    result = engine.triage(long_text, pack_id)
+    assert_human_review(result, pack)
+    assert result.level == level
+    assert [h["id"] for h in result.escalation_rules_hit] == rules
+    assert "too long" in result.reasons[0]
+    assert [s.name for s in result.steps] == ["validate_input", "screen_rules", "decide"]
+    assert classifier.calls == [] and reviewer.calls == []
 
 
 # ---- bugs inside the engine itself ---------------------------------------------
