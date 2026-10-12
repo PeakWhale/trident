@@ -1,0 +1,135 @@
+# PEAKWHALE TRIDENT rule pack
+#
+# Sorts IT incident reports into priority P1 (critical) to P4 (low),
+# and routes each one to a team. Change the teams and times to match
+# your own on-call setup.
+
+id: it-incidents
+name: IT incidents (P1-P4)
+version: "1.0"
+description: >
+  Sorts IT incident reports and service desk tickets into priority P1 to P4
+  and sends each one to the right team.
+
+# Levels: most urgent first. The last one is the lowest level.
+levels:
+  - id: P1
+    label: Critical
+    color: red
+    action: Page the on-call engineer now and open a major incident. Update stakeholders every 30 minutes.
+  - id: P2
+    label: High
+    color: orange
+    action: Assign to the on-call team. Start work within 1 hour, day or night.
+  - id: P3
+    label: Medium
+    color: yellow
+    action: Add to the team queue. Fix within 1 working day.
+  - id: P4
+    label: Low
+    color: green
+    action: Add to the service desk queue. Answer within 3 working days.
+
+categories:
+  - id: service_outage
+    description: A production service, website or app is down or can not be used by many users.
+    examples:
+      - "The website returns 503 errors for all customers"
+      - "Nobody can log in to the app since 9:00"
+    level: P1
+    route_to: SRE on-call
+
+  - id: security_incident
+    description: >
+      Signs of an attack or a security problem, for example a hacked account,
+      malware, ransomware, leaked data or a phishing link that someone clicked.
+    examples:
+      - "I clicked a link in a fake email and entered my password"
+      - "Our files have been encrypted and there is a ransom note"
+    level: P1
+    route_to: Security team
+    # A person always confirms the scope of a security incident.
+    always_human_review: true
+
+  - id: data_loss
+    description: Data in a production system is lost, deleted by mistake or corrupted.
+    examples:
+      - "The orders table was dropped in production"
+    level: P1
+    route_to: Database on-call
+
+  - id: degraded_performance
+    description: A production service still works, but it is very slow or shows many errors for many users.
+    examples:
+      - "The API is very slow, requests take 10 seconds"
+    level: P2
+    route_to: SRE on-call
+
+  - id: partial_outage
+    description: One feature, one region or one integration is broken for many users, or a workaround exists.
+    examples:
+      - "PDF export is broken for everyone but the rest of the app works"
+    level: P2
+    route_to: Owning product team
+
+  - id: single_user_issue
+    description: One person or a small group has a problem with a laptop, an app, email or their account.
+    examples:
+      - "My laptop will not connect to the VPN"
+      - "Outlook keeps crashing on my computer"
+    level: P3
+    route_to: Service desk
+
+  - id: access_request
+    description: A request for access, a new account, a password reset or a change of permissions. Nothing is broken.
+    examples:
+      - "Please give me access to the finance shared drive"
+    level: P4
+    route_to: Service desk
+
+  - id: how_to_question
+    description: A question about how to do something. Nothing is broken.
+    examples:
+      - "How do I set up my email on my phone?"
+    level: P4
+    route_to: Service desk
+
+escalation:
+  min_confidence: 0.7
+  human_review:
+    label: NEEDS HUMAN REVIEW
+    action: Send to the incident manager on duty. A person sets the priority by hand.
+    route_to: Incident manager on duty
+    interim_level: P2
+  rules:
+    - id: security-words
+      words: [ransomware, breach, "data leak", hacked, malware, phishing, "leaked credentials"]
+      then: human_review
+      level: P1
+      reason: Security words were found. A person must confirm the scope and priority.
+    - id: wide-impact-words
+      words: ["all customers", "all users", "every customer", "whole company", "production is down"]
+      then: min_level
+      level: P2
+      reason: The text says many users are affected, so the priority is at least P2.
+
+examples:
+  - name: Checkout down
+    text: "The checkout page returns HTTP 503 for all customers since 10:05. Nobody can pay."
+    expect: {outcome: DECIDED, category: service_outage, level: P1}
+
+  - name: Slow API
+    text: "The search API is very slow. p95 latency went from 200 ms to 6 seconds in the last hour."
+    expect: {outcome: DECIDED, category: degraded_performance, level: P2}
+
+  - name: Wi-Fi problem on one laptop
+    text: "My laptop will not connect to the office Wi-Fi since this morning. My colleagues are fine."
+    expect: {outcome: DECIDED, category: single_user_issue, level: P3}
+
+  - name: Access request
+    text: "Please give me read access to the finance shared drive for the quarterly report."
+    expect: {outcome: DECIDED, category: access_request, level: P4}
+
+  - name: Clicked a strange link
+    text: "I clicked a link in a strange email and typed my password. Now I see logins from another country."
+    expect: {outcome: NEEDS_HUMAN_REVIEW, category: security_incident, level: P1}

@@ -1,0 +1,130 @@
+# PEAKWHALE TRIDENT rule pack
+#
+# Sorts customer support messages into urgent, normal or low,
+# and routes each one to a team. Change the teams to match your company.
+
+id: customer-support
+name: Customer support
+version: "1.0"
+description: >
+  Sorts customer emails and chat messages into urgent, normal or low,
+  and sends each one to the right team.
+
+# Levels: most urgent first. The last one is the lowest level.
+levels:
+  - id: urgent
+    label: Urgent
+    color: red
+    action: Answer within 1 hour and tell the team lead.
+  - id: normal
+    label: Normal
+    color: yellow
+    action: Answer within 1 working day.
+  - id: low
+    label: Low
+    color: green
+    action: Answer within 3 working days.
+
+categories:
+  - id: account_security
+    description: The customer thinks their account was hacked, or sees logins, changes or payments they did not make.
+    examples:
+      - "Someone changed my password and I can not log in"
+    level: urgent
+    route_to: Trust and safety team
+
+  - id: service_unusable
+    description: The customer can not use the product at all, for example the app crashes every time or nothing loads.
+    examples:
+      - "The app crashes as soon as I open it"
+    level: urgent
+    route_to: Technical support (tier 2)
+
+  - id: billing_problem
+    description: A wrong charge, a double charge, a failed payment or a question about an invoice.
+    examples:
+      - "I was charged twice this month"
+    level: normal
+    route_to: Billing team
+
+  - id: refund_request
+    description: The customer asks for their money back.
+    examples:
+      - "I would like a refund for my last order"
+    level: normal
+    route_to: Billing team
+
+  - id: bug_report
+    description: Something does not work as expected, but the customer can still use the product.
+    examples:
+      - "The search filter ignores the date I pick"
+    level: normal
+    route_to: Technical support (tier 1)
+
+  - id: cancellation
+    description: The customer wants to cancel or downgrade their plan.
+    examples:
+      - "Please cancel my subscription at the end of the month"
+    level: normal
+    route_to: Customer retention team
+
+  - id: how_to_question
+    description: A question about how to use the product. Nothing is broken.
+    examples:
+      - "How do I add a new user to my team?"
+    level: low
+    route_to: Customer success team
+
+  - id: feature_request
+    description: An idea or a wish for a new feature.
+    examples:
+      - "Please add a dark mode"
+    level: low
+    route_to: Product team
+
+  - id: feedback
+    description: Praise or a general comment, with no problem to solve.
+    examples:
+      - "Just wanted to say your team was very helpful"
+    level: low
+    route_to: Customer success team
+
+escalation:
+  min_confidence: 0.7
+  human_review:
+    label: NEEDS HUMAN REVIEW
+    action: Send to the support team lead to sort by hand.
+    route_to: Support team lead
+    interim_level: normal
+  rules:
+    - id: legal-words
+      words: [lawyer, attorney, "legal action", sue, court, "consumer protection"]
+      then: human_review
+      level: urgent
+      reason: Legal words were found. A team lead must handle this message.
+    - id: safety-words
+      words: [injury, injured, fire, smoke, "electric shock", burned]
+      then: human_review
+      level: urgent
+      reason: The message may describe a safety problem with the product.
+
+examples:
+  - name: Hacked account
+    text: "Someone changed the email and password on my account. I did not do this and now I can not log in!"
+    expect: {outcome: DECIDED, category: account_security, level: urgent}
+
+  - name: Double charge
+    text: "Hi, I was charged twice for my March invoice. Can you please fix this?"
+    expect: {outcome: DECIDED, category: billing_problem, level: normal}
+
+  - name: How to export
+    text: "How do I export my contacts to a CSV file?"
+    expect: {outcome: DECIDED, category: how_to_question, level: low}
+
+  - name: Feature idea
+    text: "It would be great if you added a dark mode to the mobile app."
+    expect: {outcome: DECIDED, category: feature_request, level: low}
+
+  - name: Legal threat
+    text: "You charged me twice and ignored my last three emails. My lawyer will contact you next week."
+    expect: {outcome: NEEDS_HUMAN_REVIEW, category: billing_problem, level: urgent}

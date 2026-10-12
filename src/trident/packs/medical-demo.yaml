@@ -1,0 +1,148 @@
+# PEAKWHALE TRIDENT rule pack
+#
+# DEMO ONLY. This pack shows how the engine works with a familiar example.
+# It is NOT medical advice, NOT a medical device, and was NOT checked by
+# doctors. Do not use it for real patients or clinical decisions.
+
+id: medical-demo
+name: Medical triage (demo only)
+version: "1.0"
+description: >
+  Sorts a short description of symptoms into RED, YELLOW or GREEN.
+  Made to show how the engine works. Not medical advice.
+disclaimer: >
+  DEMO ONLY. Not for real patients or clinical decisions. This pack is not a
+  medical device and was not checked by doctors. In an emergency, call your
+  local emergency number.
+
+# Levels: most urgent first. The last one is the lowest level.
+levels:
+  - id: RED
+    label: Emergency
+    color: red
+    action: "Demo action: emergency response. Call emergency services now."
+  - id: YELLOW
+    label: Urgent
+    color: yellow
+    action: "Demo action: see a doctor or urgent care within a few hours."
+  - id: GREEN
+    label: Routine
+    color: green
+    action: "Demo action: home care. Book a normal appointment if it does not get better."
+
+categories:
+  - id: cardiac
+    description: >
+      Possible heart problem. Chest pain or chest pressure, often with
+      sweating, pain that spreads to the arm, jaw or back, or feeling faint.
+    examples:
+      - "Crushing chest pain going down my left arm and I am sweating"
+      - "Tight chest, feeling sick and dizzy"
+    level: RED
+
+  - id: stroke
+    description: >
+      Possible stroke. Sudden face drooping, weakness of an arm or leg on one
+      side, slurred speech or sudden confusion.
+    examples:
+      - "Her face is drooping on one side and her speech is slurred"
+      - "Sudden weakness in my right arm and leg"
+    level: RED
+
+  - id: severe_breathing
+    description: >
+      Serious trouble breathing. Can not speak full sentences, gasping for
+      air, lips or face turning blue.
+    examples:
+      - "He is gasping for air and can not finish a sentence"
+    level: RED
+
+  - id: respiratory_infection
+    description: >
+      Fever with cough, sore throat or mild shortness of breath, without
+      chest pain and without serious breathing trouble.
+    examples:
+      - "High fever and a bad cough for three days"
+      - "Fever 39C, cough, a bit short of breath when walking"
+    level: YELLOW
+
+  - id: injury
+    description: >
+      An injury such as a possible broken bone, a deep cut or a bad sprain.
+    examples:
+      - "I fell and my wrist is swollen and very painful"
+      - "Deep cut on my hand from a kitchen knife"
+    level: YELLOW
+
+  - id: abdominal_pain
+    description: >
+      Strong or lasting stomach pain, repeated vomiting, or stomach pain
+      with fever.
+    examples:
+      - "Sharp pain in the lower right side of my stomach since last night"
+    level: YELLOW
+
+  - id: skin_minor
+    description: >
+      A small, local skin problem such as a rash, itching or an insect bite,
+      with no fever and no swelling of the face or throat.
+    examples:
+      - "Itchy rash on my arm after gardening"
+    level: GREEN
+
+  - id: cold_minor
+    description: >
+      Mild cold symptoms such as a runny nose or a mild sore throat, without
+      fever and without breathing trouble.
+    examples:
+      - "Runny nose and sneezing since yesterday, I feel fine otherwise"
+    level: GREEN
+
+escalation:
+  # Below this confidence the case goes to a human.
+  min_confidence: 0.75
+  human_review:
+    label: NEEDS HUMAN REVIEW
+    action: >
+      A qualified clinician must assess this case. Demo only: in real life,
+      if you are in doubt, call emergency services.
+    route_to: Clinician on duty
+    # While waiting for a person, treat the case as at least this level.
+    interim_level: YELLOW
+  rules:
+    - id: life-threat-words
+      words: [unconscious, unresponsive, "not breathing", "severe bleeding", seizure, overdose, "blue lips"]
+      then: min_level
+      level: RED
+      reason: Words that can mean a threat to life were found.
+    - id: self-harm-words
+      words: [suicide, suicidal, "kill myself", "self-harm", "hurt myself"]
+      then: human_review
+      level: RED
+      reason: Possible risk of self-harm. A person must handle this case now.
+    - id: pregnancy-or-baby
+      words: [pregnant, pregnancy, newborn, infant]
+      then: human_review
+      reason: Pregnancy or a very young baby needs a clinician to decide.
+
+# Sample cases. The web UI shows them, and the tests check them.
+examples:
+  - name: Chest pain with sweating
+    text: "Severe crushing chest pain going down my left arm. I am sweating and feel sick. It started 30 minutes ago."
+    expect: {outcome: DECIDED, category: cardiac, level: RED}
+
+  - name: Fever and cough
+    text: "High fever of 39.5C, a wet cough and a bit short of breath when I walk, for 3 days. No chest pain."
+    expect: {outcome: DECIDED, category: respiratory_infection, level: YELLOW}
+
+  - name: Rash after gardening
+    text: "Itchy red rash on my forearm after gardening yesterday. No fever and no other symptoms."
+    expect: {outcome: DECIDED, category: skin_minor, level: GREEN}
+
+  - name: Fall with a red-flag word
+    text: "I fell off my bike and I think my wrist is broken. My friend says I was unconscious for a minute."
+    expect: {outcome: DECIDED, category: injury, level: RED}
+
+  - name: Unclear complaint
+    text: "I just feel strange and not like myself today."
+    expect: {outcome: NEEDS_HUMAN_REVIEW, category: unknown, level: YELLOW}
