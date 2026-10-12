@@ -18,6 +18,10 @@ dependencies = [
     "uvicorn>=0.40.0",
 ]
 
+[project.scripts]
+trident = "trident.cli:main"
+trident-mcp = "trident.mcp_server:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.3",
