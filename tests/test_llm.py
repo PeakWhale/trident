@@ -116,11 +116,30 @@ def test_settings_openai_compatible():
         {"TRIDENT_LLM_TIMEOUT": "soon"},
         {"TRIDENT_LLM_TIMEOUT": "-1"},
         {"TRIDENT_MAX_INPUT_CHARS": "0"},
+        {"TRIDENT_LLM_TIMEOUT": "nan"},
+        {"TRIDENT_LLM_TIMEOUT": "inf"},
+        {"TRIDENT_LLM_TIMEOUT": "1e400"},
+        {"TRIDENT_MAX_INPUT_CHARS": "0.5"},
+        {"TRIDENT_MAX_INPUT_CHARS": "8000.5"},
+        {"TRIDENT_MAX_INPUT_CHARS": "inf"},
+        {"TRIDENT_MAX_INPUT_CHARS": "nan"},
+        {"TRIDENT_MAX_INPUT_CHARS": "-5"},
     ],
 )
 def test_bad_settings_fail_loudly(env):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="TRIDENT_"):
         Settings.from_env(env)
+
+
+def test_max_input_chars_setting():
+    assert Settings.from_env({"TRIDENT_MAX_INPUT_CHARS": " 12000 "}).max_input_chars == 12000
+    assert Settings.from_env({}).max_input_chars == 8000
+
+
+@pytest.mark.parametrize("timeout", [float("nan"), float("inf"), 0, -1])
+def test_engine_rejects_a_bad_timeout(registry, timeout):
+    with pytest.raises(ValueError):
+        TriageEngine(registry, object(), timeout_s=timeout)  # type: ignore[arg-type]
 
 
 def test_dotenv_is_read_from_the_current_folder(tmp_path, monkeypatch):

@@ -22,6 +22,7 @@ and the case is then never treated as the lowest level.
 from __future__ import annotations
 
 import logging
+import math
 import operator
 import time
 import uuid
@@ -147,8 +148,8 @@ class TriageEngine:
         max_input_chars: int = 8000,
         audit: AuditSink | None = None,
     ):
-        if timeout_s <= 0:
-            raise ValueError("timeout_s must be greater than 0")
+        if not (math.isfinite(timeout_s) and timeout_s > 0):
+            raise ValueError("timeout_s must be a finite number greater than 0")
         self.packs = packs
         self.classifier = classifier
         self.reviewer = reviewer if reviewer is not None else classifier

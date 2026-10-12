@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -28,8 +29,23 @@ def _number(env: Mapping[str, str], key: str, default: float) -> float:
         number = float(value)
     except ValueError:
         raise ValueError(f"{key} must be a number, got {value!r}") from None
+    if not math.isfinite(number):
+        raise ValueError(f"{key} must be a finite number, got {value!r}")
     if number <= 0:
         raise ValueError(f"{key} must be greater than 0, got {value!r}")
+    return number
+
+
+def _whole_number(env: Mapping[str, str], key: str, default: int) -> int:
+    value = env.get(key)
+    if value is None or value.strip() == "":
+        return default
+    try:
+        number = int(value.strip())
+    except ValueError:
+        raise ValueError(f"{key} must be a whole number, got {value!r}") from None
+    if number < 1:
+        raise ValueError(f"{key} must be at least 1, got {value!r}")
     return number
 
 
@@ -60,7 +76,7 @@ class Settings:
             api_key=env.get("TRIDENT_LLM_API_KEY") or env.get("OPENAI_API_KEY") or None,
             json_mode=_flag(env.get("TRIDENT_JSON_MODE"), True),
             timeout_s=_number(env, "TRIDENT_LLM_TIMEOUT", 60.0),
-            max_input_chars=int(_number(env, "TRIDENT_MAX_INPUT_CHARS", 8000)),
+            max_input_chars=_whole_number(env, "TRIDENT_MAX_INPUT_CHARS", 8000),
             audit_log=env.get("TRIDENT_AUDIT_LOG") or None,
             packs_dir=env.get("TRIDENT_PACKS_DIR") or None,
         )
