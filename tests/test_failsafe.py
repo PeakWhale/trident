@@ -224,7 +224,7 @@ def test_confidence_at_the_limit_is_enough(make_engine):
     assert engine.triage(LOW_TEXT, PACK).outcome == DECIDED
 
 
-# ---- reviewer -------------------------------------------------------------------
+# ---- reviewer (second check) ------------------------------------------------------
 
 
 def test_reviewer_disagreement_needs_human_review(make_engine, pack):
@@ -296,7 +296,7 @@ def test_reviewer_sees_the_decision_and_the_rules(make_engine):
     reviewer = FakeLLM(agree("access_request"))
     make_engine(FakeLLM(LOW_OK), reviewer).triage(LOW_TEXT, PACK)
     call = reviewer.calls[0]
-    assert "independent reviewer" in call["system"]
+    assert "You are the reviewer" in call["system"]
     assert "access_request -> P4" in call["system"]
     assert "category: access_request" in call["user"]
     assert call["schema"]["properties"]["agrees"] == {"type": "boolean"}

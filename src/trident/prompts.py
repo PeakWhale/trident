@@ -1,4 +1,4 @@
-"""Prompts for the two LLM roles: the classifier and the independent reviewer.
+"""Prompts for the two LLM roles: the classifier and the reviewer (a second check).
 
 Both prompts are built only from the rule pack, so they work for any domain.
 """
@@ -69,7 +69,7 @@ def classifier_user_prompt(text: str) -> str:
 
 def reviewer_system_prompt(pack: RulePack) -> str:
     lines = [
-        f"You are the independent reviewer in a triage system. Rule pack: {pack.name}.",
+        f"You are the reviewer in a triage system. Rule pack: {pack.name}.",
         "Another model put a case into a category. Fixed rules then turned that category into a level.",
         "Check this decision yourself. Read the case text and the rules below. Do not simply trust the decision.",
         "",

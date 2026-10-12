@@ -143,7 +143,7 @@ All settings are environment variables. You can also put them in a `.env` file (
 | `TRIDENT_LLM_PROVIDER` | `ollama` | `ollama`, or `openai` for any OpenAI-compatible endpoint |
 | `TRIDENT_LLM_BASE_URL` | `http://localhost:11434` (ollama), `https://api.openai.com/v1` (openai) | Where the model runs |
 | `TRIDENT_LLM_MODEL` | `llama3.1:8b` | Model for the classifier |
-| `TRIDENT_REVIEW_MODEL` | same as above | Model for the independent review |
+| `TRIDENT_REVIEW_MODEL` | same as above | Model for the review (the second check) |
 | `TRIDENT_LLM_API_KEY` | - | API key (`OPENAI_API_KEY` also works) |
 | `TRIDENT_JSON_MODE` | `on` | Ask the endpoint for JSON only. Turn `off` if your server does not support it |
 | `TRIDENT_LLM_TIMEOUT` | `60` | Seconds to wait for one model answer |
@@ -162,7 +162,9 @@ export TRIDENT_LLM_API_KEY=sk-...
 uv run trident serve
 ```
 
-Tip: use a different model for `TRIDENT_REVIEW_MODEL`. Then the second check is more independent.
+Tip: use a different model for `TRIDENT_REVIEW_MODEL`. By default the reviewer is the same model as the
+classifier, and it sees the classifier's answer, so it is a second check, not an independent one. A different
+model makes it more independent.
 
 ## Rule packs
 
@@ -360,7 +362,8 @@ and the command line tool. GitHub Actions runs them on Python 3.11, 3.12 and 3.1
 | ![MCP](https://img.shields.io/badge/MCP-2563eb?style=flat-square&logo=anthropic&logoColor=white) | MCP server for AI assistants (official Python SDK) |
 | ![uv](https://img.shields.io/badge/uv-de5fe9?style=flat-square&logo=astral&logoColor=white) | Package manager and CI |
 
-About "multi-agent": there are exactly two AI roles, a **classifier** and an independent **reviewer**.
+About "multi-agent": there are exactly two AI roles, a **classifier** and a **reviewer** (a second check, which is
+only more independent if you set a different `TRIDENT_REVIEW_MODEL`).
 Version 0.1 also used CrewAI and Microsoft AutoGen. Version 0.2 removed them. Two plain LLM calls with strict
 JSON checks do the same job with fewer parts that can break.
 

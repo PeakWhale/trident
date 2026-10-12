@@ -10,7 +10,8 @@ A small LangGraph state machine:
 * classify        asks the LLM for {category, confidence, evidence} as JSON,
                   checks it against a schema, and retries once if it is invalid.
 * apply_rules     maps the category to a level with the pack's rules (no AI).
-* review          a second, independent LLM prompt re-checks the decision.
+* review          a second LLM prompt re-checks the decision (the same model,
+                  unless a different review model is set).
 * decide          the fail-safe gate.
 
 The gate is "default deny": a case is DECIDED only when every check passed
@@ -468,7 +469,7 @@ class TriageEngine:
                     f"('{out.category}' instead of '{c['category']}')."
                 )
             else:
-                reason = f"The independent reviewer disagreed (its category: '{out.category}'). {out.reason}".strip()
+                reason = f"The reviewer disagreed (its category: '{out.category}'). {out.reason}".strip()
             return _NodeResult({"review_result": review, "reasons": [reason]}, "escalated", reason, data)
 
         reason = f"The reviewer answer was invalid {MAX_ATTEMPTS} times: {last_error}"

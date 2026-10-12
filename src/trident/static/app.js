@@ -432,7 +432,7 @@ function displayResult(result) {
     }
     ui.resultProtocol.replaceChildren(...cards);
 
-    // Independent review
+    // Review (second check)
     const review = result.review;
     if (!review) {
         ui.qaBadge.textContent = 'Not run';
