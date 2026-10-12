@@ -99,7 +99,13 @@ def create_app(engine: TriageEngine | None = None, allowed_hosts: Iterable[str] 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
         eng = get_engine()
-        return {"status": "ok", "version": __version__, "packs": eng.packs.ids(), "models": eng.model_names}
+        return {
+            "status": "ok",
+            "version": __version__,
+            "packs": eng.packs.ids(),
+            "models": eng.model_names,
+            "max_input_chars": eng.max_input_chars,
+        }
 
     @app.get("/api/packs")
     def list_packs() -> list[dict[str, Any]]:

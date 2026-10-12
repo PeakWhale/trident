@@ -38,6 +38,7 @@ const ui = {
     packLevels: $('display-pack-levels'),
     packCategories: $('display-pack-categories'),
     packConfidence: $('display-pack-confidence'),
+    charCount: $('char-count'),
 };
 
 const state = {
@@ -45,6 +46,8 @@ const state = {
     pack: null,
     logEntries: 0,
     startTime: null,
+    // From /api/health. Text over this limit is not cut: the server sends it to human review.
+    maxInputChars: null,
 };
 
 // ---------- small helpers ----------
@@ -99,6 +102,16 @@ function addLog(type, source, message) {
     ui.logCount.textContent = `${state.logEntries} events`;
 }
 
+function updateCharCount() {
+    const length = ui.caseText.value.length;
+    const limit = state.maxInputChars;
+    const over = limit !== null && length > limit;
+    ui.charCount.textContent = limit === null
+        ? `${length} characters`
+        : `${length} / ${limit} characters${over ? ' - too long, this case will go to human review' : ''}`;
+    ui.charCount.classList.toggle('over', over);
+}
+
 // ---------- packs ----------
 
 async function loadHealth() {
@@ -111,6 +124,8 @@ async function loadHealth() {
         ui.footerVersion.textContent = `Peakwhale™ Trident v${data.version}`;
         $('agent-classifier-model').textContent = data.models.classifier;
         $('agent-reviewer-model').textContent = data.models.reviewer;
+        state.maxInputChars = Number.isInteger(data.max_input_chars) ? data.max_input_chars : null;
+        updateCharCount();
     } catch (error) {
         ui.statusText.textContent = 'Server offline';
         ui.statusLight.classList.add('offline');
@@ -195,6 +210,7 @@ function selectExample() {
     } else {
         ui.caseText.value = pack.examples[Number(value)].text;
     }
+    updateCharCount();
     resetAll();
 }
 
@@ -482,6 +498,7 @@ ui.packSelect.addEventListener('change', () => selectPack(ui.packSelect.value));
 ui.exampleSelect.addEventListener('change', selectExample);
 ui.caseText.addEventListener('input', () => {
     if (ui.exampleSelect.value !== 'custom') ui.exampleSelect.value = 'custom';
+    updateCharCount();
 });
 ui.analyzeBtn.addEventListener('click', runAnalysis);
 

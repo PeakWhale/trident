@@ -271,8 +271,11 @@
 
                         <div class="form-group">
                             <label for="case-text">Case Text</label>
-                            <textarea id="case-text" class="statement-box case-textarea" rows="5" maxlength="8000"
+                            <!-- No maxlength: the browser would cut pasted text without a word.
+                                 The server decides; text over the limit goes to human review. -->
+                            <textarea id="case-text" class="statement-box case-textarea" rows="5"
                                 placeholder="Type or paste the text to sort..."></textarea>
+                            <div class="char-count" id="char-count" aria-live="polite"></div>
                         </div>
 
                         <button id="analyze-btn" class="primary-btn" disabled>

@@ -26,6 +26,7 @@ def test_health(client_for):
     assert data["status"] == "ok"
     assert data["models"] == {"classifier": "clf", "reviewer": "rev"}
     assert sorted(data["packs"]) == ["customer-support", "it-incidents", "medical-demo"]
+    assert data["max_input_chars"] == 8000
 
 
 def test_list_and_get_packs(client_for):

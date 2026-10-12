@@ -688,6 +688,17 @@ main {
     color: var(--text-primary);
 }
 
+.char-count {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    text-align: right;
+}
+
+.char-count.over {
+    color: var(--status-yellow);
+}
+
 .primary-btn {
     padding: 10px 14px;
     background: var(--accent-blue);
