@@ -121,6 +121,16 @@ def interim_level(pack: RulePack, *candidates: str | None) -> str:
     return pack.most_urgent(pack.escalation.human_review.interim_level, *known)  # type: ignore[return-value]
 
 
+def _suggested_levels(pack: RulePack, state: dict[str, Any]) -> list[str | None]:
+    """Every level a check suggested, including the level of the reviewer's own category."""
+    levels = [state.get("level"), state.get("final_level"), state.get("proposed_level"), state.get("min_level")]
+    review_category = (state.get("review_result") or {}).get("category")
+    cat = pack.category(review_category) if isinstance(review_category, str) else None
+    if cat is not None:
+        levels.append(cat.level)
+    return levels
+
+
 class TriageEngine:
     """Domain-agnostic "AI plus rules" triage with a fail-safe gate."""
 
@@ -468,7 +478,7 @@ class TriageEngine:
                 {"checks": checks},
             )
         extra = [] if state.get("reasons") else ["Safety gate: not every check passed."]
-        level = interim_level(pack, state.get("final_level"), state.get("proposed_level"), state.get("min_level"))
+        level = interim_level(pack, *_suggested_levels(pack, state))
         failed = [name for name, passed in checks.items() if not passed]
         return _NodeResult(
             {"outcome": HUMAN_REVIEW, "level": level, "gate_checks": checks, "reasons": extra},
@@ -502,9 +512,7 @@ class TriageEngine:
         level_id = state.get("level")
         if outcome != DECIDED or not level_id or reasons:
             outcome = HUMAN_REVIEW
-            level_id = interim_level(
-                pack, state.get("level"), state.get("final_level"), state.get("proposed_level"), state.get("min_level")
-            )
+            level_id = interim_level(pack, *_suggested_levels(pack, state))
             if not reasons:
                 reasons = ["The engine did not finish every check."]
 

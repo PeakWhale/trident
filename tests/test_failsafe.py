@@ -204,7 +204,7 @@ def test_confidence_at_the_limit_is_enough(make_engine):
     assert engine.triage(LOW_TEXT, PACK).outcome == DECIDED
 
 
-# ---- independent reviewer ----------------------------------------------------
+# ---- reviewer -------------------------------------------------------------------
 
 
 def test_reviewer_disagreement_needs_human_review(make_engine, pack):
@@ -212,6 +212,7 @@ def test_reviewer_disagreement_needs_human_review(make_engine, pack):
     result = engine.triage(LOW_TEXT, PACK)
     assert_human_review(result, pack)
     assert "disagreed" in result.reasons[0]
+    assert result.level == "P1"  # the reviewer's category (data_loss) is P1
     assert result.review == {
         "agrees": False,
         "category": "data_loss",
@@ -225,6 +226,33 @@ def test_reviewer_says_agree_but_picks_other_category(make_engine, pack):
     result = engine.triage(LOW_TEXT, PACK)
     assert_human_review(result, pack)
     assert "different category" in result.reasons[0]
+    assert result.level == "P2"  # both categories are P4, so the interim level
+
+
+def test_reviewer_agrees_but_names_a_more_urgent_category(make_engine, pack):
+    engine = make_engine(FakeLLM(LOW_OK), FakeLLM(agree("security_incident")))
+    result = engine.triage(LOW_TEXT, PACK)
+    assert_human_review(result, pack)
+    assert result.level == "P1"
+
+
+@pytest.mark.parametrize(
+    ("pack_id", "text", "answer", "review_category", "level"),
+    [
+        ("medical-demo", "I have a small itchy rash on my arm.", classified("skin_minor", 0.9, ["itchy rash"]), "cardiac", "RED"),
+        ("it-incidents", LOW_TEXT, LOW_OK, "security_incident", "P1"),
+        ("it-incidents", LOW_TEXT, LOW_OK, "degraded_performance", "P2"),
+        ("it-incidents", LOW_TEXT, LOW_OK, "unknown", "P2"),
+    ],
+)
+def test_reviewer_category_raises_the_treat_as_level(make_engine, registry, pack_id, text, answer, review_category, level):
+    pack = registry.get(pack_id)
+    engine = make_engine(FakeLLM(answer), FakeLLM(disagree(review_category)))
+    result = engine.triage(text, pack_id)
+    assert_human_review(result, pack)
+    assert result.review["category"] == review_category
+    assert result.level == level
+    assert step(result, "decide").detail.endswith(f"Treat as {level} while waiting.")
 
 
 def test_reviewer_text_yes_is_not_a_boolean(make_engine, pack):
