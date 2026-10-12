@@ -85,11 +85,47 @@ def test_triage_unknown_pack(client_for):
 
 @pytest.mark.parametrize(
     "body",
-    [{"text": "", "pack": "it-incidents"}, {"text": TEXT}, {"pack": "it-incidents"}, {"text": TEXT, "pack": ""}],
+    [{"text": TEXT}, {"pack": "it-incidents"}, {"text": TEXT, "pack": ""}, {"text": 5, "pack": "it-incidents"}],
 )
 def test_triage_bad_request(client_for, body):
     response = client_for(FakeLLM(), FakeLLM()).post("/api/triage", json=body)
     assert response.status_code == 422
+
+
+def test_triage_empty_text_needs_human_review(client_for):
+    response = client_for(FakeLLM(), FakeLLM()).post("/api/triage", json={"text": "", "pack": "it-incidents"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["outcome"] == "NEEDS_HUMAN_REVIEW"
+    assert data["reasons"] == ["The input text is empty."]
+
+
+def test_triage_long_text_needs_human_review_and_keeps_red_flags(client_for):
+    client = client_for(FakeLLM(), FakeLLM())
+    text = "ransomware " + "log line ok\n" * 1000
+    response = client.post("/api/triage", json={"text": text, "pack": "it-incidents"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["outcome"] == "NEEDS_HUMAN_REVIEW"
+    assert data["level"] == "P1"
+    assert [hit["id"] for hit in data["escalation_rules_hit"]] == ["security-words"]
+
+
+def test_triage_text_over_the_request_limit(client_for):
+    from trident.server import MAX_REQUEST_CHARS
+
+    response = client_for(FakeLLM(), FakeLLM()).post(
+        "/api/triage", json={"text": "x" * (MAX_REQUEST_CHARS + 1), "pack": "it-incidents"}
+    )
+    assert response.status_code == 422
+    assert "longer than 50000 characters" in response.json()["detail"]
+
+
+def test_request_limit_follows_a_higher_input_limit(client_for):
+    client = client_for(FakeLLM(RuntimeError("down")), FakeLLM(), max_input_chars=60_000)
+    response = client.post("/api/triage", json={"text": "x " * 27_500, "pack": "it-incidents"})
+    assert response.status_code == 200
+    assert "classifier model failed" in response.json()["reasons"][0]
 
 
 # ---- a web page must not be able to use the local server --------------------

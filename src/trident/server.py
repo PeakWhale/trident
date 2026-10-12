@@ -20,6 +20,8 @@ from .models import TriageResult
 from .packs import PackError, PackNotFoundError, RulePack
 
 STATIC_DIR = Path(__file__).parent / "static"
+# Hard limit for one request. Text above TRIDENT_MAX_INPUT_CHARS but below this
+# limit gets NEEDS_HUMAN_REVIEW. Text above this limit gets HTTP 422.
 MAX_REQUEST_CHARS = 50_000
 # Host names the server answers to. Other Host headers get HTTP 400, which
 # blocks DNS rebinding from a web page. Set TRIDENT_ALLOWED_HOSTS to change it.
@@ -30,7 +32,7 @@ logger = logging.getLogger("trident.server")
 
 
 class TriageRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=MAX_REQUEST_CHARS, description="The case to sort, as plain text.")
+    text: str = Field(description="The case to sort, as plain text. Empty text gives NEEDS_HUMAN_REVIEW.")
     pack: str = Field(min_length=1, max_length=100, description="Rule pack id, for example 'it-incidents'.")
 
 
@@ -113,8 +115,12 @@ def create_app(engine: TriageEngine | None = None, allowed_hosts: Iterable[str] 
     # A plain `def` runs in a worker thread, so slow model calls do not block the server.
     @app.post("/api/triage", response_model=TriageResult)
     def triage(request: TriageRequest) -> TriageResult:
+        eng = get_engine()
+        limit = max(MAX_REQUEST_CHARS, eng.max_input_chars)
+        if len(request.text) > limit:
+            raise HTTPException(status_code=422, detail=f"text is longer than {limit} characters")
         try:
-            return get_engine().triage(request.text, request.pack)
+            return eng.triage(request.text, request.pack)
         except PackNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from None
 
