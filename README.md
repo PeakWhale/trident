@@ -28,7 +28,7 @@
   <img src="https://img.shields.io/badge/Ollama-Llama_3.1-7c3aed?style=flat-square&logo=meta&logoColor=white" alt="Ollama" />
   <img src="https://img.shields.io/badge/OpenAI-compatible-412991?style=flat-square&logo=openai&logoColor=white" alt="OpenAI-compatible" />
   <img src="https://img.shields.io/badge/MCP-Server-2563eb?style=flat-square&logo=anthropic&logoColor=white" alt="MCP" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" />
+  <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="Apache 2.0 License" />
 </p>
 
 ---
@@ -433,7 +433,7 @@ trident/
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
+Apache License 2.0 © 2025-2026 Aditya Rao (Addy) Kaveti. See [LICENSE](LICENSE) and [NOTICE](NOTICE). If you share or build on Trident, keep the NOTICE file. PeakWhale™ is Addy's project name; the license does not cover the name or logo.
 
 ---
 

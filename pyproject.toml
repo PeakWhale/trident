@@ -3,8 +3,8 @@ name = "trident"
 version = "0.2.0"
 description = "PEAKWHALE™ TRIDENT - fail-safe AI plus rules triage engine with editable rule packs"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 dependencies = [
     "anyio>=4.5",
