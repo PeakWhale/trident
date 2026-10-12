@@ -12,9 +12,16 @@ wheels/
 # Environment variables (contains API keys)
 .env
 .env.*
+!.env.example
+
+# Audit logs (contain input text)
+logs/
+*.jsonl
 
 # Cache directories
 .cache/
+.pytest_cache/
+.ruff_cache/
 
 # UV/Python version files
 .python-version
