@@ -152,6 +152,17 @@ def test_lone_surrogate_is_rejected():
         parse_pack(raw, source="test.yaml")
 
 
+@pytest.mark.parametrize("version", [1.10, 1.2, True])
+def test_version_must_be_text_or_a_whole_number(version):
+    with pytest.raises(PackError, match="version"):
+        parse_pack(pack_with(version=version))
+
+
+def test_version_text_keeps_every_digit():
+    assert parse_pack('version: "1.10"\n' + pack_with(version="x").replace("version: x\n", "")).version == "1.10"
+    assert parse_pack(pack_with(version=2)).version == "2"
+
+
 def test_missing_file(tmp_path):
     with pytest.raises(PackError, match="can not read"):
         load_pack(tmp_path / "missing.yaml")

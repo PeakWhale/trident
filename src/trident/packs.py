@@ -147,9 +147,14 @@ class RulePack(_Strict):
     @model_validator(mode="before")
     @classmethod
     def _version_as_text(cls, data: Any) -> Any:
-        # Let people write `version: 1` or `version: 1.2` in YAML.
-        if isinstance(data, dict) and isinstance(data.get("version"), (int, float)):
-            data = {**data, "version": str(data["version"])}
+        # Let people write `version: 1` in YAML. A number with a dot is not
+        # allowed: YAML reads 1.10 as the number 1.1, so digits would be lost.
+        if isinstance(data, dict):
+            version = data.get("version")
+            if isinstance(version, float):
+                raise ValueError(f'version {version!r} must be text in quotes, for example version: "1.10"')
+            if isinstance(version, int) and not isinstance(version, bool):
+                data = {**data, "version": str(version)}
         return data
 
     @model_validator(mode="after")
