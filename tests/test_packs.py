@@ -210,6 +210,22 @@ def test_escalation_words_match_whole_words(text, found):
     assert rule.find(text) == found
 
 
+@pytest.mark.parametrize(
+    ("word", "text", "found"),
+    [
+        ("can't breathe", "He can't breathe", ["can't breathe"]),
+        ("can't breathe", "He can\u2019t breathe", ["can't breathe"]),
+        ("can't breathe", "He CAN\u2018T  breathe", ["can't breathe"]),
+        ("can\u2019t breathe", "He can't breathe", ["can't breathe"]),
+        ("won't wake up", "she won\u2019t wake up", ["won't wake up"]),
+        ("can't breathe", "He cant breathe", []),
+    ],
+)
+def test_escalation_words_match_curly_apostrophes(word, text, found):
+    pack = parse_pack(pack_with(escalation__rules__0__words=[word]))
+    assert pack.escalation.rules[0].find(text) == found
+
+
 def test_sue_does_not_match_issue(registry):
     rule = next(r for r in registry.get("customer-support").escalation.rules if r.id == "legal-words")
     assert rule.find("I have an issue with my invoice") == []

@@ -34,6 +34,12 @@ ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]*$"
 
 Color = Literal["red", "orange", "yellow", "green", "blue", "gray"]
 
+APOSTROPHES = "['\u2019\u2018]"
+
+
+def _straight_apostrophes(text: str) -> str:
+    return text.replace("\u2019", "'").replace("\u2018", "'")
+
 
 class PackError(ValueError):
     """A rule pack file is missing, unreadable or invalid."""
@@ -97,13 +103,17 @@ class EscalationRule(_Strict):
     def pattern(self) -> re.Pattern[str]:
         parts = []
         for word in self.words:
-            escaped = r"\s+".join(re.escape(piece) for piece in word.strip().split())
+            pieces = _straight_apostrophes(word).strip().split()
+            # A straight or curly apostrophe matches either: phones type "can’t".
+            escaped = r"\s+".join(re.escape(piece).replace("'", APOSTROPHES) for piece in pieces)
             parts.append(rf"(?<!\w){escaped}(?!\w)")
         return re.compile("|".join(parts), re.IGNORECASE)
 
     def find(self, text: str) -> list[str]:
         """Return the words of this rule that appear in the text."""
-        return sorted({" ".join(m.group(0).lower().split()) for m in self.pattern.finditer(text)})
+        return sorted(
+            {" ".join(_straight_apostrophes(m.group(0)).lower().split()) for m in self.pattern.finditer(text)}
+        )
 
 
 class HumanReview(_Strict):
