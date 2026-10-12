@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 import os
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -19,6 +21,10 @@ from .packs import PackError, PackNotFoundError, RulePack
 
 STATIC_DIR = Path(__file__).parent / "static"
 MAX_REQUEST_CHARS = 50_000
+# Host names the server answers to. Other Host headers get HTTP 400, which
+# blocks DNS rebinding from a web page. Set TRIDENT_ALLOWED_HOSTS to change it.
+DEFAULT_ALLOWED_HOSTS = ("127.0.0.1", "localhost", "[::1]")
+WILDCARD_BINDS = ("0.0.0.0", "::", "")
 
 logger = logging.getLogger("trident.server")
 
@@ -28,14 +34,34 @@ class TriageRequest(BaseModel):
     pack: str = Field(min_length=1, max_length=100, description="Rule pack id, for example 'it-incidents'.")
 
 
+def allowed_hosts_from_env() -> list[str] | None:
+    """TRIDENT_ALLOWED_HOSTS as a list (comma separated), or None when it is not set."""
+    value = os.environ.get("TRIDENT_ALLOWED_HOSTS", "")
+    hosts = [h.strip().lower() for h in value.split(",") if h.strip()]
+    return hosts or None
+
+
+def _host_name(header: str) -> str:
+    """The host name of a Host header, without the port. Keeps IPv6 brackets."""
+    header = header.strip().lower()
+    if header.startswith("["):
+        end = header.find("]")
+        return header[: end + 1] if end != -1 else header
+    return header.split(":", 1)[0]
+
+
 def pack_details(pack: RulePack) -> dict[str, Any]:
     data = pack.model_dump(mode="json")
     data["lowest_level"] = pack.lowest_level
     return data
 
 
-def create_app(engine: TriageEngine | None = None) -> FastAPI:
-    """Build the app. Pass an engine to use a custom (or fake) LLM, for example in tests."""
+def create_app(engine: TriageEngine | None = None, allowed_hosts: Iterable[str] | None = None) -> FastAPI:
+    """Build the app. Pass an engine to use a custom (or fake) LLM, for example in tests.
+
+    allowed_hosts: host names the server answers to. Default: TRIDENT_ALLOWED_HOSTS,
+    else 127.0.0.1, localhost and [::1]. Use ["*"] to allow any host name.
+    """
     app = FastAPI(
         title="PeakWhale Trident",
         version=__version__,
@@ -44,11 +70,29 @@ def create_app(engine: TriageEngine | None = None) -> FastAPI:
     holder: dict[str, TriageEngine] = {}
     if engine is not None:
         holder["engine"] = engine
+    if allowed_hosts is None:
+        allowed_hosts = allowed_hosts_from_env() or DEFAULT_ALLOWED_HOSTS
+    hosts = {h.strip().lower() for h in allowed_hosts}
+    allow_any_host = "*" in hosts
 
     def get_engine() -> TriageEngine:
         if "engine" not in holder:
             holder["engine"] = TriageEngine.from_settings()
         return holder["engine"]
+
+    @app.middleware("http")
+    async def guard(request: Request, call_next):
+        # A web page in the browser can send requests to localhost. Two checks stop
+        # it from using this server: the Host header must be a known name (stops
+        # DNS rebinding), and a POST must say it is JSON (a page can only send that
+        # cross-site after a CORS preflight, which this server does not allow).
+        if not allow_any_host and _host_name(request.headers.get("host", "")) not in hosts:
+            return JSONResponse({"detail": "Invalid host header. See TRIDENT_ALLOWED_HOSTS."}, status_code=400)
+        if request.method == "POST" and request.url.path.startswith("/api/"):
+            content_type = request.headers.get("content-type", "").split(";")[0].strip().lower()
+            if content_type != "application/json":
+                return JSONResponse({"detail": "Content-Type must be application/json."}, status_code=415)
+        return await call_next(request)
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
@@ -89,8 +133,23 @@ def main(host: str | None = None, port: int | None = None) -> None:
         logging.basicConfig(level=os.environ.get("TRIDENT_LOG_LEVEL", "INFO"))
         host = host or os.environ.get("TRIDENT_HOST", "127.0.0.1")
         port = port or int(os.environ.get("TRIDENT_PORT", "8000"))
+        allowed = allowed_hosts_from_env()
+        if allowed is None:
+            allowed = list(DEFAULT_ALLOWED_HOSTS)
+            if host in WILDCARD_BINDS:
+                print(
+                    "Note: only requests to localhost are accepted. Set TRIDENT_ALLOWED_HOSTS to the "
+                    "host names people use to reach this server.",
+                    file=sys.stderr,
+                )
+            else:
+                # Also answer to the address the server was started on.
+                name = host.strip().lower()
+                name = f"[{name}]" if ":" in name and not name.startswith("[") else name
+                if name not in allowed:
+                    allowed.append(name)
         # Build the engine now, so a broken rule pack or setting fails at start-up.
-        app = create_app(TriageEngine.from_settings())
+        app = create_app(TriageEngine.from_settings(), allowed_hosts=allowed)
     except (PackError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1) from None

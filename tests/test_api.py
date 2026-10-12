@@ -14,8 +14,8 @@ OUTAGE = classified("service_outage", 0.95, ["returns HTTP 503"])
 
 @pytest.fixture
 def client_for(make_engine):
-    def factory(classifier, reviewer):
-        return TestClient(create_app(make_engine(classifier, reviewer)))
+    def factory(classifier, reviewer, **engine_kwargs):
+        return TestClient(create_app(make_engine(classifier, reviewer, **engine_kwargs)), base_url="http://localhost")
 
     return factory
 
@@ -90,6 +90,59 @@ def test_triage_unknown_pack(client_for):
 def test_triage_bad_request(client_for, body):
     response = client_for(FakeLLM(), FakeLLM()).post("/api/triage", json=body)
     assert response.status_code == 422
+
+
+# ---- a web page must not be able to use the local server --------------------
+
+
+@pytest.mark.parametrize("host", ["rebind.attacker.example:8765", "evil.example", "127.0.0.1.nip.io:8000", ""])
+def test_unknown_host_header_is_rejected(make_engine, host):
+    classifier = FakeLLM(OUTAGE)
+    client = TestClient(create_app(make_engine(classifier, FakeLLM(agree("service_outage")))))
+    headers = {"Host": host, "Origin": f"http://{host}"}
+    assert client.get("/api/health", headers=headers).status_code == 400
+    response = client.post("/api/triage", json={"text": TEXT, "pack": "it-incidents"}, headers=headers)
+    assert response.status_code == 400
+    assert classifier.calls == []
+
+
+@pytest.mark.parametrize("host", ["localhost", "localhost:8000", "127.0.0.1:8765", "[::1]:8000", "LOCALHOST"])
+def test_local_host_headers_are_allowed(make_engine, host):
+    client = TestClient(create_app(make_engine(FakeLLM(), FakeLLM())))
+    assert client.get("/api/health", headers={"Host": host}).status_code == 200
+
+
+def test_allowed_hosts_setting(make_engine, monkeypatch):
+    monkeypatch.setenv("TRIDENT_ALLOWED_HOSTS", "trident.internal, Other.Example")
+    client = TestClient(create_app(make_engine(FakeLLM(), FakeLLM())))
+    assert client.get("/api/health", headers={"Host": "trident.internal:8000"}).status_code == 200
+    assert client.get("/api/health", headers={"Host": "other.example"}).status_code == 200
+    assert client.get("/api/health", headers={"Host": "localhost"}).status_code == 400
+    any_host = TestClient(create_app(make_engine(FakeLLM(), FakeLLM()), allowed_hosts=["*"]))
+    assert any_host.get("/api/health", headers={"Host": "anything.example"}).status_code == 200
+
+
+@pytest.mark.parametrize("content_type", [None, "text/plain", "application/x-www-form-urlencoded", "multipart/form-data"])
+def test_triage_needs_a_json_content_type(client_for, content_type):
+    import json
+
+    classifier = FakeLLM(OUTAGE)
+    client = client_for(classifier, FakeLLM(agree("service_outage")))
+    headers = {"Content-Type": content_type} if content_type else {}
+    body = json.dumps({"text": TEXT, "pack": "it-incidents"}).encode()
+    response = client.post("/api/triage", content=body, headers=headers)
+    assert response.status_code == 415
+    assert classifier.calls == []
+
+
+def test_json_content_type_with_charset_is_fine(client_for):
+    import json
+
+    client = client_for(FakeLLM(OUTAGE), FakeLLM(agree("service_outage")))
+    body = json.dumps({"text": TEXT, "pack": "it-incidents"}).encode()
+    response = client.post("/api/triage", content=body, headers={"Content-Type": "application/json; charset=utf-8"})
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "DECIDED"
 
 
 def test_web_ui_is_served(client_for):
