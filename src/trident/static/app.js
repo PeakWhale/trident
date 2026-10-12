@@ -1,525 +1,489 @@
-// Clinical Scenarios
-const scenarios = {
-    cardiac: {
-        text: "Patient presents with severe crushing chest pain radiating to left arm, diaphoresis, and shortness of breath. Patient appears pale and distressed. Onset 30 minutes ago.",
-        patientId: "P-101",
-        expectedLevel: "RED"
-    },
-    respiratory: {
-        text: "Patient reports high fever (103°F), productive cough, and difficulty breathing for 3 days. SpO2 measured at 94%. No chest pain. General fatigue reported.",
-        patientId: "P-999",
-        expectedLevel: "YELLOW"
-    },
-    dermatology: {
-        text: "Patient presents with localized itchy rash on forearm, appeared after gardening. No fever, no respiratory symptoms, no systemic involvement.",
-        patientId: "P-102",
-        expectedLevel: "GREEN"
-    }
+'use strict';
+
+// PEAKWHALE TRIDENT web UI.
+// Everything shown here comes from the server: rule packs from /api/packs,
+// decisions and the audit trail from /api/triage. The UI never invents a level.
+
+const NODES = ['validate_input', 'screen_rules', 'classify', 'apply_rules', 'review', 'decide'];
+const STEP_STATUS_TEXT = { ok: 'Done', escalated: 'Escalated', error: 'Error', skipped: 'Skipped' };
+const STEP_LOG_TYPE = { ok: 'node', escalated: 'warn', error: 'error', skipped: 'data' };
+const LEVEL_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'gray'];
+const STORAGE_KEY = 'trident.pack';
+
+const $ = (id) => document.getElementById(id);
+
+const ui = {
+    packSelect: $('pack-select'),
+    exampleSelect: $('example-select'),
+    caseText: $('case-text'),
+    analyzeBtn: $('analyze-btn'),
+    logContainer: $('log-container'),
+    logCount: $('log-count'),
+    resultProtocol: $('result-protocol'),
+    resultDecision: $('result-decision'),
+    decisionLevel: $('decision-level'),
+    decisionAction: $('decision-action'),
+    levelBlocks: $('level-blocks'),
+    disclaimerBanner: $('disclaimer-banner'),
+    disclaimerText: $('disclaimer-text'),
+    statusLight: $('status-light'),
+    statusText: $('status-text'),
+    footerVersion: $('footer-version'),
+    dbPackName: $('db-pack-name'),
+    qaBadge: $('qa-badge'),
+    qaAgrees: $('qa-agrees'),
+    qaCategory: $('qa-category'),
+    qaConfidence: $('qa-confidence'),
+    packId: $('display-pack-id'),
+    packLevels: $('display-pack-levels'),
+    packCategories: $('display-pack-categories'),
+    packConfidence: $('display-pack-confidence'),
 };
 
-// Triage Protocols
-const protocols = {
-    RED: {
-        title: "Red Protocol - Emergency",
-        text: "Chest pain with diaphoresis or radiating arm pain indicates potential cardiac emergency.",
-        criteria: ["Chest pain present", "Diaphoresis (sweating)", "Radiating pain to arm", "Patient distress"]
-    },
-    YELLOW: {
-        title: "Yellow Protocol - Urgent",
-        text: "Fever with respiratory symptoms and reduced oxygen saturation requires urgent evaluation.",
-        criteria: ["Elevated temperature (>101°F)", "Respiratory symptoms", "SpO2 below 95%", "No cardiac indicators"]
-    },
-    GREEN: {
-        title: "Green Protocol - Routine",
-        text: "Localized dermatological symptoms without systemic involvement - standard outpatient care.",
-        criteria: ["Localized symptoms", "No fever", "No respiratory involvement", "No systemic symptoms"]
-    }
+const state = {
+    packs: [],
+    pack: null,
+    logEntries: 0,
+    startTime: null,
 };
 
-// Patient Database with treatment considerations
-const patients = {
-    "P-101": { 
-        name: "Sarah Connor", 
-        age: 45, 
-        history: "Hypertension, Penicillin Allergy",
-        treatmentConsiderations: [
-            "ALLERGY: Avoid Penicillin, Amoxicillin, Ampicillin",
-            "Use Azithromycin or Fluoroquinolones instead",
-            "Monitor blood pressure closely",
-            "Caution with NSAIDs and decongestants"
-        ]
-    },
-    "P-102": { 
-        name: "Logan Roy", 
-        age: 82, 
-        history: "Previous Stroke, Diabetes Type 2",
-        treatmentConsiderations: [
-            "HIGH RISK: Previous stroke - rapid neuro assessment",
-            "Monitor blood glucose levels",
-            "Caution with corticosteroids",
-            "Neurological status monitoring required"
-        ]
-    },
-    "P-999": { 
-        name: "John Doe", 
-        age: 25, 
-        history: "None",
-        treatmentConsiderations: [
-            "No significant medical history",
-            "Standard treatment protocols apply"
-        ]
-    }
-};
+// ---------- small helpers ----------
 
-// DOM Elements
-const scenarioSelect = document.getElementById('scenario-select');
-const symptomsText = document.getElementById('symptoms-text');
-const analyzeBtn = document.getElementById('analyze-btn');
-const logContainer = document.getElementById('log-container');
-const logCount = document.getElementById('log-count');
-const resultProtocol = document.getElementById('result-protocol');
-const resultDecision = document.getElementById('result-decision');
-const decisionLevel = document.getElementById('decision-level');
-const decisionAction = document.getElementById('decision-action');
-
-// Architecture Elements
-const blocks = {
-    input: document.getElementById('block-input'),
-    orchestrator: document.getElementById('block-orchestrator'),
-    nodeContext: document.getElementById('block-node-context'),
-    nodeMedical: document.getElementById('block-node-medical'),
-    nodeRouter: document.getElementById('block-node-router'),
-    toolPatient: document.getElementById('block-tool-patient'),
-    toolTreatment: document.getElementById('block-tool-treatment'),
-    toolGuidelines: document.getElementById('block-tool-guidelines'),
-    dbPatient: document.getElementById('block-db-patient'),
-    dbTreatment: document.getElementById('block-db-treatment'),
-    dbGuidelines: document.getElementById('block-db-guidelines'),
-    actionRed: document.getElementById('block-action-red'),
-    actionYellow: document.getElementById('block-action-yellow'),
-    actionGreen: document.getElementById('block-action-green'),
-    // AutoGen QA Review
-    qaReview: document.getElementById('block-qa-review'),
-    output: document.getElementById('block-output')
-};
-
-const statuses = {
-    input: document.getElementById('status-input'),
-    orchestrator: document.getElementById('status-orchestrator'),
-    nodeContext: document.getElementById('status-node-context'),
-    nodeMedical: document.getElementById('status-node-medical'),
-    nodeRouter: document.getElementById('status-node-router'),
-    toolPatient: document.getElementById('status-tool-patient'),
-    toolTreatment: document.getElementById('status-tool-treatment'),
-    toolGuidelines: document.getElementById('status-tool-guidelines'),
-    qaReview: document.getElementById('status-qa-review')
-};
-
-const calls = {
-    patientRecord: document.getElementById('call-patient-record'),
-    treatment: document.getElementById('call-treatment'),
-    guidelines: document.getElementById('call-guidelines')
-};
-
-const agents = {
-    nurse: document.getElementById('agent-nurse'),
-    doctor: document.getElementById('agent-doctor'),
-    // AutoGen agents
-    qaReviewer: document.getElementById('agent-qa-reviewer'),
-    auditor: document.getElementById('agent-auditor')
-};
-
-// QA Review elements
-const qaElements = {
-    badge: document.getElementById('qa-badge'),
-    validated: document.getElementById('qa-validated'),
-    confidence: document.getElementById('qa-confidence')
-};
-
-const agentArrow = document.querySelector('.agent-arrow');
-const flowArrows = document.querySelectorAll('.flow-arrow');
-const toolGroups = document.querySelectorAll('.tool-group');
-
-// State
-let logEntries = 0;
-let startTime = null;
-
-// Utilities
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function make(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    return node;
+}
+
+function levelName(id, label) {
+    return id.toLowerCase() === String(label).toLowerCase() ? label : `${id} (${label})`;
+}
+
+function colorOf(color) {
+    return LEVEL_COLORS.includes(color) ? color : 'gray';
 }
 
 function getTimestamp() {
-    if (!startTime) return '0.00s';
-    return ((Date.now() - startTime) / 1000).toFixed(2) + 's';
+    if (!state.startTime) return '0.00s';
+    return ((Date.now() - state.startTime) / 1000).toFixed(2) + 's';
 }
 
-// Update patient display
-function updatePatientDisplay(patientId) {
-    const patient = patients[patientId];
-    document.getElementById('display-patient-id').textContent = patientId;
-    document.getElementById('display-patient-name').textContent = patient.name;
-    document.getElementById('display-patient-history').textContent = patient.history;
+function savePackChoice(id) {
+    try { localStorage.setItem(STORAGE_KEY, id); } catch (e) { /* storage may be blocked */ }
 }
 
-// Update scenario
-function updateScenario() {
-    const scenario = scenarios[scenarioSelect.value];
-    symptomsText.textContent = scenario.text;
-    updatePatientDisplay(scenario.patientId);
-    resetAll();
+function loadPackChoice() {
+    try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
 }
 
-// Reset everything
-function resetAll() {
-    // Reset blocks
-    Object.values(blocks).forEach(block => block?.classList.remove('active'));
-    
-    // Reset statuses
-    Object.entries(statuses).forEach(([key, el]) => {
-        if (el) {
-            if (key === 'input') el.textContent = 'Waiting';
-            else if (key === 'orchestrator') el.textContent = 'Idle';
-            else if (key.startsWith('node')) el.textContent = 'Pending';
-            else if (key.startsWith('tool')) el.textContent = 'Ready';
-        }
-    });
-    
-    // Reset tool calls
-    Object.values(calls).forEach(call => call?.classList.remove('active'));
-    
-    // Reset agents
-    Object.values(agents).forEach(agent => agent?.classList.remove('active'));
-    agentArrow?.classList.remove('active');
-    
-    // Reset flow arrows
-    flowArrows.forEach(arrow => arrow.classList.remove('active'));
-    
-    // Reset tool groups
-    toolGroups.forEach(group => group.classList.remove('active'));
-    
-    // Reset logs
-    logContainer.innerHTML = '<div class="log-empty">Execution trace will appear here when analysis runs.</div>';
-    logEntries = 0;
-    logCount.textContent = '0 events';
-    
-    // Reset results
-    resultProtocol.innerHTML = '<div class="protocol-empty">Protocol match will display after analysis.</div>';
-    resultDecision.className = 'result-decision';
-    decisionLevel.textContent = 'STANDBY';
-    decisionAction.textContent = 'Awaiting analysis...';
-    
-    // Reset QA review
-    if (qaElements.badge) {
-        qaElements.badge.textContent = 'Pending';
-        qaElements.badge.className = 'qa-badge';
-    }
-    if (qaElements.validated) qaElements.validated.textContent = '-';
-    if (qaElements.confidence) {
-        qaElements.confidence.textContent = '-';
-        qaElements.confidence.className = 'qa-value';
-    }
-}
+// ---------- log ----------
 
-// Add log entry
 function addLog(type, source, message) {
-    if (logContainer.querySelector('.log-empty')) {
-        logContainer.innerHTML = '';
+    if (ui.logContainer.querySelector('.log-empty')) {
+        ui.logContainer.replaceChildren();
     }
-    
-    const entry = document.createElement('div');
-    entry.className = `log-entry ${type}`;
-    entry.innerHTML = `
-        <span class="log-time">${getTimestamp()}</span>
-        <span class="log-source">${source}</span>
-        <span class="log-message">${message}</span>
-    `;
-    logContainer.appendChild(entry);
-    logContainer.scrollTop = logContainer.scrollHeight;
-    
-    logEntries++;
-    logCount.textContent = `${logEntries} events`;
+    const entry = make('div', `log-entry ${type}`);
+    entry.append(
+        make('span', 'log-time', getTimestamp()),
+        make('span', 'log-source', source),
+        make('span', 'log-message', message),
+    );
+    ui.logContainer.appendChild(entry);
+    ui.logContainer.scrollTop = ui.logContainer.scrollHeight;
+    state.logEntries += 1;
+    ui.logCount.textContent = `${state.logEntries} events`;
 }
 
-// Display protocol with treatment considerations
-function displayProtocol(level, patient) {
-    const protocol = protocols[level];
-    const colorClass = level.toLowerCase();
-    
-    resultProtocol.innerHTML = `
-        <div class="protocol-card ${colorClass}">
-            <div class="protocol-title">${protocol.title}</div>
-            <p class="protocol-text">${protocol.text}</p>
-            <div class="protocol-criteria">
-                <div class="criteria-label">Matched Criteria</div>
-                ${protocol.criteria.map(c => `
-                    <div class="criteria-item">
-                        <span class="criteria-check">✓</span>
-                        <span>${c}</span>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-        <div class="treatment-card">
-            <div class="treatment-title">Treatment Considerations (from Patient History)</div>
-            ${patient.treatmentConsiderations.map(c => `
-                <div class="treatment-item">
-                    <span class="treatment-bullet">•</span>
-                    <span>${c}</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
-}
+// ---------- packs ----------
 
-// Display final decision
-function displayDecision(level, plan, qaReview = null) {
-    resultDecision.className = `result-decision status-${level.toLowerCase()}`;
-    
-    const levelText = {
-        RED: 'CRITICAL (RED)',
-        YELLOW: 'URGENT (YELLOW)',
-        GREEN: 'ROUTINE (GREEN)'
-    };
-    
-    decisionLevel.textContent = levelText[level] || level;
-    decisionAction.innerHTML = plan.replace(/\n/g, '<br>');
-    
-    // Update QA Review display
-    if (qaReview && qaElements.badge) {
-        const validated = qaReview.validated;
-        qaElements.badge.textContent = validated ? 'Validated' : 'Needs Review';
-        qaElements.badge.className = `qa-badge ${validated ? 'validated' : 'needs-review'}`;
-        
-        if (qaElements.validated) {
-            qaElements.validated.textContent = validated ? 'Yes' : 'No';
-        }
-        
-        if (qaElements.confidence) {
-            const confidence = qaReview.confidence || 'MEDIUM';
-            qaElements.confidence.textContent = confidence;
-            qaElements.confidence.className = `qa-value ${confidence.toLowerCase()}`;
-        }
-    } else if (qaElements.badge) {
-        // No review data means the decision was NOT checked. Never show it as validated.
-        qaElements.badge.textContent = 'Needs Review';
-        qaElements.badge.className = 'qa-badge needs-review';
-        if (qaElements.validated) qaElements.validated.textContent = 'No';
-        if (qaElements.confidence) {
-            qaElements.confidence.textContent = 'LOW';
-            qaElements.confidence.className = 'qa-value low';
-        }
-    }
-}
-
-// Animate architecture flow
-async function animateFlow(level, scenario) {
-    const patient = patients[scenario.patientId];
-    
-    // === STEP 1: Input received ===
-    blocks.input?.classList.add('active');
-    statuses.input.textContent = 'Received';
-    addLog('data', 'Input', `Patient ${scenario.patientId} data received`);
-    await sleep(300);
-    
-    flowArrows[0]?.classList.add('active');
-    await sleep(200);
-    
-    // === STEP 2: Orchestrator starts ===
-    blocks.orchestrator?.classList.add('active');
-    statuses.orchestrator.textContent = 'Running';
-    addLog('orchestrator', 'LangGraph', 'Workflow engine started, initializing state');
-    await sleep(300);
-    
-    flowArrows[1]?.classList.add('active');
-    await sleep(200);
-    
-    // === STEP 3: Node 1 - gather_context ===
-    blocks.nodeContext?.classList.add('active');
-    statuses.nodeContext.textContent = 'Executing';
-    addLog('node', 'gather_context', 'Executing node: Gathering patient context');
-    await sleep(300);
-    
-    // Tool call: get_patient_record
-    calls.patientRecord?.classList.add('active');
-    blocks.toolPatient?.classList.add('active');
-    toolGroups[0]?.classList.add('active');
-    statuses.toolPatient.textContent = 'Querying';
-    addLog('tool', 'get_patient_record', `Querying EMR for patient ${scenario.patientId}`);
-    await sleep(300);
-    
-    blocks.dbPatient?.classList.add('active');
-    addLog('data', 'Patient EMR', `Retrieved: ${patient.name}, History: ${patient.history}`);
-    statuses.toolPatient.textContent = 'Done';
-    await sleep(250);
-    
-    // Tool call: get_treatment_considerations
-    calls.treatment?.classList.add('active');
-    blocks.toolTreatment?.classList.add('active');
-    toolGroups[1]?.classList.add('active');
-    statuses.toolTreatment.textContent = 'Analyzing';
-    addLog('tool', 'get_treatment', `Analyzing history for contraindications`);
-    await sleep(300);
-    
-    blocks.dbTreatment?.classList.add('active');
-    addLog('data', 'Treatment Rules', `Found ${patient.treatmentConsiderations.length} considerations`);
-    statuses.toolTreatment.textContent = 'Done';
-    await sleep(250);
-    
-    statuses.nodeContext.textContent = 'Complete';
-    addLog('node', 'gather_context', 'Node complete: Context stored in state');
-    await sleep(200);
-    
-    flowArrows[2]?.classList.add('active');
-    await sleep(200);
-    
-    // === STEP 4: Node 2 - medical_board ===
-    blocks.nodeMedical?.classList.add('active');
-    statuses.nodeMedical.textContent = 'Executing';
-    addLog('node', 'medical_board', 'Executing node: Running CrewAI medical analysis');
-    await sleep(300);
-    
-    // Agent: Triage Nurse
-    agents.nurse?.classList.add('active');
-    addLog('agent', 'Triage Nurse', 'Agent activated: Analyzing symptoms');
-    await sleep(400);
-    
-    // Tool call: get_triage_guidelines
-    calls.guidelines?.classList.add('active');
-    blocks.toolGuidelines?.classList.add('active');
-    toolGroups[2]?.classList.add('active');
-    statuses.toolGuidelines.textContent = 'Searching';
-    addLog('tool', 'get_triage_guidelines', 'Searching protocols for symptom match');
-    await sleep(300);
-    
-    blocks.dbGuidelines?.classList.add('active');
-    addLog('data', 'Triage Protocols', `Matched: ${level} PROTOCOL`);
-    statuses.toolGuidelines.textContent = 'Done';
-    await sleep(250);
-    
-    addLog('agent', 'Triage Nurse', `Findings: Protocol indicates ${level} level`);
-    await sleep(200);
-    
-    // Agent: ER Physician
-    agentArrow?.classList.add('active');
-    await sleep(150);
-    
-    agents.doctor?.classList.add('active');
-    addLog('agent', 'ER Physician', 'Agent activated: Reviewing findings');
-    await sleep(400);
-    
-    addLog('agent', 'ER Physician', `Decision: Confirmed ${level} based on protocol`);
-    await sleep(200);
-    
-    statuses.nodeMedical.textContent = 'Complete';
-    addLog('node', 'medical_board', `Node complete: Diagnosis = ${level}`);
-    
-    // Display protocol
-    displayProtocol(level, patient);
-    await sleep(200);
-    
-    flowArrows[3]?.classList.add('active');
-    await sleep(200);
-    
-    // === STEP 5: Router ===
-    blocks.nodeRouter?.classList.add('active');
-    statuses.nodeRouter.textContent = 'Routing';
-    addLog('node', 'route_logic', `Evaluating state.final_diagnosis = "${level}"`);
-    await sleep(300);
-    
-    const routeTarget = level.toLowerCase();
-    statuses.nodeRouter.textContent = `→ ${routeTarget}`;
-    addLog('node', 'route_logic', `Routing to action node: "${routeTarget}"`);
-    await sleep(200);
-    
-    // === STEP 6: Action Node ===
-    const actionBlock = blocks[`action${level.charAt(0) + level.slice(1).toLowerCase()}`];
-    actionBlock?.classList.add('active');
-    addLog('decision', routeTarget, `Generating action plan with treatment considerations`);
-    await sleep(300);
-    
-    // === STEP 7: AutoGen QA Review ===
-    blocks.qaReview?.classList.add('active');
-    if (statuses.qaReview) statuses.qaReview.textContent = 'Reviewing';
-    addLog('autogen', 'qa_review', 'Executing node: AutoGen quality assurance review');
-    await sleep(300);
-    
-    // Agent: QA Reviewer
-    agents.qaReviewer?.classList.add('active');
-    addLog('autogen', 'QA Reviewer', 'Agent activated: Checking protocol compliance');
-    await sleep(400);
-    
-    addLog('autogen', 'QA Reviewer', `Verified: ${level} decision matches symptom protocol`);
-    await sleep(200);
-    
-    // Agent: Clinical Auditor
-    agents.auditor?.classList.add('active');
-    addLog('autogen', 'Clinical Auditor', 'Agent activated: Validating review');
-    await sleep(400);
-    
-    addLog('autogen', 'Clinical Auditor', 'Confidence assessment: HIGH - Protocol adherence confirmed');
-    await sleep(200);
-    
-    if (statuses.qaReview) statuses.qaReview.textContent = 'Complete';
-    addLog('autogen', 'qa_review', 'Node complete: Decision validated');
-    await sleep(200);
-    
-    // === STEP 8: Final Output ===
-    blocks.output?.classList.add('active');
-    addLog('decision', 'Output', `Triage complete: ${level} with QA validation`);
-}
-
-// Run analysis
-async function runAnalysis() {
-    const scenario = scenarios[scenarioSelect.value];
-    
-    analyzeBtn.disabled = true;
-    analyzeBtn.textContent = 'Running Analysis...';
-    
-    resetAll();
-    startTime = Date.now();
-    decisionLevel.textContent = 'ANALYZING...';
-    decisionAction.textContent = 'Processing through workflow...';
-    
+async function loadHealth() {
     try {
-        const response = await fetch('/analyze', {
+        const res = await fetch('/api/health');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        ui.statusText.textContent = `Server online · ${data.models.classifier}`;
+        ui.statusLight.classList.remove('offline');
+        ui.footerVersion.textContent = `Peakwhale™ Trident v${data.version}`;
+        $('agent-classifier-model').textContent = data.models.classifier;
+        $('agent-reviewer-model').textContent = data.models.reviewer;
+    } catch (error) {
+        ui.statusText.textContent = 'Server offline';
+        ui.statusLight.classList.add('offline');
+    }
+}
+
+async function loadPacks() {
+    try {
+        const res = await fetch('/api/packs');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        state.packs = await res.json();
+    } catch (error) {
+        ui.packSelect.replaceChildren(make('option', null, 'Could not load rule packs'));
+        addLog('error', 'Packs', `Could not load rule packs: ${error.message}`);
+        return;
+    }
+
+    ui.packSelect.replaceChildren(
+        ...state.packs.map((pack) => {
+            const option = make('option', null, pack.name);
+            option.value = pack.id;
+            return option;
+        }),
+    );
+    ui.packSelect.disabled = false;
+    ui.exampleSelect.disabled = false;
+    ui.analyzeBtn.disabled = false;
+
+    const saved = loadPackChoice();
+    const first = state.packs.find((p) => p.id === saved) || state.packs.find((p) => !p.disclaimer) || state.packs[0];
+    if (first) {
+        ui.packSelect.value = first.id;
+        selectPack(first.id);
+    }
+}
+
+function selectPack(packId) {
+    const pack = state.packs.find((p) => p.id === packId);
+    if (!pack) return;
+    state.pack = pack;
+    savePackChoice(pack.id);
+
+    ui.packId.textContent = `${pack.id} v${pack.version}`;
+    ui.packLevels.textContent = pack.levels.map((l) => l.id).join(' > ');
+    ui.packCategories.textContent = String(pack.categories.length);
+    ui.packConfidence.textContent = pack.escalation.min_confidence.toFixed(2);
+    ui.dbPackName.textContent = `${pack.id}.yaml`;
+
+    if (pack.disclaimer) {
+        ui.disclaimerText.textContent = pack.disclaimer;
+        ui.disclaimerBanner.hidden = false;
+    } else {
+        ui.disclaimerBanner.hidden = true;
+    }
+
+    const options = pack.examples.map((example, index) => {
+        const option = make('option', null, `${example.name} (expected: ${expectedText(example.expect)})`);
+        option.value = String(index);
+        return option;
+    });
+    const custom = make('option', null, 'Custom text');
+    custom.value = 'custom';
+    ui.exampleSelect.replaceChildren(...options, custom);
+    ui.exampleSelect.value = pack.examples.length ? '0' : 'custom';
+    selectExample();
+    renderLevelBlocks(pack);
+    resetAll();
+}
+
+function expectedText(expect) {
+    if (expect.outcome === 'NEEDS_HUMAN_REVIEW') return 'human review';
+    return expect.level || expect.outcome;
+}
+
+function selectExample() {
+    const pack = state.pack;
+    if (!pack) return;
+    const value = ui.exampleSelect.value;
+    if (value === 'custom') {
+        ui.caseText.value = '';
+        ui.caseText.focus();
+    } else {
+        ui.caseText.value = pack.examples[Number(value)].text;
+    }
+    resetAll();
+}
+
+function renderLevelBlocks(pack) {
+    const blocks = pack.levels.map((level, index) => {
+        const block = make('div', `arch-block action-block level-${colorOf(level.color)}`);
+        block.id = `block-level-${level.id}`;
+        const tag = index === pack.levels.length - 1 ? 'Lowest' : `Level ${index + 1}`;
+        block.append(
+            make('div', 'block-tag action-tag', tag),
+            make('div', 'block-header', `${level.id} · ${level.label}`),
+            make('div', 'block-desc', level.action),
+        );
+        return block;
+    });
+    const review = make('div', 'arch-block action-block review-action');
+    review.id = 'block-level-human-review';
+    review.append(
+        make('div', 'block-tag action-tag', 'Fail-safe'),
+        make('div', 'block-header', pack.escalation.human_review.label),
+        make('div', 'block-desc', pack.escalation.human_review.action),
+    );
+    ui.levelBlocks.replaceChildren(...blocks, review);
+}
+
+// ---------- reset ----------
+
+function resetAll() {
+    document.querySelectorAll('.arch-block, .agent-item, .call-item, .flow-arrow, .tool-group').forEach((node) => {
+        node.classList.remove('active', 'interim', 'step-ok', 'step-escalated', 'step-error', 'step-skipped');
+    });
+    $('status-input').textContent = 'Waiting';
+    $('status-orchestrator').textContent = 'Idle';
+    NODES.forEach((name) => { $(`status-node-${name}`).textContent = 'Pending'; });
+    ['pack', 'escalation', 'audit'].forEach((name) => { $(`status-tool-${name}`).textContent = 'Ready'; });
+
+    ui.logContainer.replaceChildren(make('div', 'log-empty', 'Execution trace will appear here when analysis runs.'));
+    state.logEntries = 0;
+    ui.logCount.textContent = '0 events';
+
+    ui.resultProtocol.replaceChildren(make('div', 'protocol-empty', 'The matched rule will display after analysis.'));
+    ui.resultDecision.className = 'result-decision';
+    ui.decisionLevel.textContent = 'STANDBY';
+    ui.decisionAction.textContent = 'Awaiting analysis...';
+
+    ui.qaBadge.textContent = 'Pending';
+    ui.qaBadge.className = 'qa-badge';
+    ui.qaAgrees.textContent = '-';
+    ui.qaCategory.textContent = '-';
+    ui.qaConfidence.textContent = '-';
+    ui.qaConfidence.className = 'qa-value';
+}
+
+// ---------- animation from the real audit trail ----------
+
+function activate(id, ...classes) {
+    const node = $(id);
+    if (node) node.classList.add('active', ...classes);
+}
+
+function activateTool(name, status) {
+    activate(`group-${name}`);
+    activate(`block-tool-${name}`);
+    activate(`block-db-${name}`);
+    $(`status-tool-${name}`).textContent = status;
+}
+
+async function animateSteps(result) {
+    const flowArrows = document.querySelectorAll('.flow-arrow');
+    activate('block-input');
+    $('status-input').textContent = 'Received';
+    addLog('data', 'Input', `${result.input_text.length} characters, rule pack "${result.pack}" v${result.pack_version}`);
+    await sleep(150);
+    flowArrows[0]?.classList.add('active');
+    activate('block-orchestrator');
+    $('status-orchestrator').textContent = 'Running';
+    addLog('orchestrator', 'LangGraph', `Workflow started (request ${result.request_id.slice(0, 8)})`);
+    await sleep(150);
+
+    const ran = new Set();
+    for (const step of result.steps) {
+        ran.add(step.name);
+        const index = NODES.indexOf(step.name);
+        if (index > 0) flowArrows[index]?.classList.add('active');
+        activate(`block-node-${step.name}`, `step-${step.status}`);
+        const statusEl = $(`status-node-${step.name}`);
+        if (statusEl) statusEl.textContent = `${STEP_STATUS_TEXT[step.status] || step.status} · ${step.duration_ms} ms`;
+
+        if (step.name === 'screen_rules') {
+            activate('call-escalation');
+            activateTool('escalation', (step.data.matched || []).length ? 'Matched' : 'No match');
+        }
+        if (step.name === 'classify') {
+            activate('agent-classifier');
+            activate('call-schema');
+        }
+        if (step.name === 'apply_rules') {
+            activate('call-pack');
+            activateTool('pack', 'Applied');
+        }
+        if (step.name === 'review' && step.status !== 'skipped') activate('agent-reviewer');
+
+        addLog(STEP_LOG_TYPE[step.status] || 'node', step.name, step.detail || STEP_STATUS_TEXT[step.status]);
+        for (const attempt of step.data.attempts || []) {
+            const who = step.name === 'classify' ? 'Classifier' : 'Reviewer';
+            if (attempt.error) {
+                addLog('warn', who, `Try ${attempt.attempt}: ${attempt.error}`);
+            } else {
+                addLog('agent', who, `Try ${attempt.attempt}: valid JSON (${attempt.ms} ms)`);
+            }
+        }
+        await sleep(200);
+    }
+
+    NODES.filter((name) => !ran.has(name)).forEach((name) => {
+        $(`status-node-${name}`).textContent = 'Not run';
+    });
+
+    activateTool('audit', 'Recorded');
+    if (result.needs_human_review) {
+        activate('block-level-human-review');
+        activate(`block-level-${result.level}`, 'interim');
+    } else {
+        activate(`block-level-${result.level}`);
+    }
+    activate('block-output');
+    $('status-orchestrator').textContent = 'Done';
+    addLog(
+        result.needs_human_review ? 'warn' : 'decision',
+        'Output',
+        result.needs_human_review
+            ? `NEEDS HUMAN REVIEW (treat as ${result.level} while waiting) · total ${result.timing_ms.total} ms`
+            : `${result.level} decided · total ${result.timing_ms.total} ms`,
+    );
+}
+
+// ---------- result display ----------
+
+function displayResult(result) {
+    const pack = state.packs.find((p) => p.id === result.pack) || state.pack;
+    const color = result.needs_human_review ? 'review' : colorOf(result.level_color);
+
+    // Decision
+    ui.resultDecision.className = `result-decision status-${color}`;
+    ui.decisionLevel.textContent = result.headline;
+    const action = [make('div', 'decision-text', result.action)];
+    if (result.route_to) action.push(make('div', 'decision-meta', `Route to: ${result.route_to}`));
+    if (result.needs_human_review) {
+        action.push(make('div', 'interim-note', `Treat as ${levelName(result.level, result.level_label)} until a person decides.`));
+    }
+    ui.decisionAction.replaceChildren(...action);
+
+    // Rule matched + evidence
+    const cards = [];
+    const category = pack && result.category ? pack.categories.find((c) => c.id === result.category) : null;
+    const card = make('div', `protocol-card ${category ? colorOf(result.rule_matched ? levelColor(pack, result.rule_matched.final_level) : 'gray') : 'review'}`);
+    if (category && result.rule_matched) {
+        const rm = result.rule_matched;
+        card.append(make('div', 'protocol-title', `Rule: ${category.id} → ${rm.final_level}`));
+        card.append(make('p', 'protocol-text', category.description));
+        const criteria = make('div', 'protocol-criteria');
+        criteria.append(make('div', 'criteria-label', 'Evidence from the text'));
+        result.evidence.forEach((quote) => {
+            const item = make('div', 'criteria-item');
+            item.append(make('span', 'criteria-check', '✓'), make('span', 'evidence-quote', `"${quote}"`));
+            criteria.append(item);
+        });
+        if (rm.raised_by && rm.raised_by.length) {
+            criteria.append(make('div', 'criteria-label', `Raised from ${rm.category_level} by: ${rm.raised_by.join(', ')}`));
+        }
+        card.append(criteria);
+    } else {
+        card.append(make('div', 'protocol-title', 'No rule matched'));
+        card.append(make('p', 'protocol-text', result.category === 'unknown'
+            ? 'The classifier could not match the text to any category.'
+            : 'The engine could not finish the checks for this case.'));
+    }
+    cards.push(card);
+
+    if (result.reasons.length) {
+        const reasons = make('div', 'treatment-card reasons-card');
+        reasons.append(make('div', 'treatment-title', 'Why a person must review this'));
+        result.reasons.forEach((reason) => {
+            const item = make('div', 'treatment-item');
+            item.append(make('span', 'treatment-bullet', '•'), make('span', null, reason));
+            reasons.append(item);
+        });
+        cards.push(reasons);
+    }
+    if (result.escalation_rules_hit.length) {
+        const hits = make('div', 'treatment-card');
+        hits.append(make('div', 'treatment-title', 'Escalation rules matched'));
+        result.escalation_rules_hit.forEach((hit) => {
+            const item = make('div', 'treatment-item');
+            item.append(make('span', 'treatment-bullet', '•'), make('span', null, `${hit.id}: ${hit.words.join(', ')}`));
+            hits.append(item);
+        });
+        cards.push(hits);
+    }
+    ui.resultProtocol.replaceChildren(...cards);
+
+    // Independent review
+    const review = result.review;
+    if (!review) {
+        ui.qaBadge.textContent = 'Not run';
+        ui.qaBadge.className = 'qa-badge needs-review';
+        ui.qaAgrees.textContent = '-';
+        ui.qaCategory.textContent = '-';
+    } else {
+        const agrees = review.agrees === true && review.category === result.category;
+        ui.qaBadge.textContent = agrees ? 'Agrees' : 'Disagrees';
+        ui.qaBadge.className = `qa-badge ${agrees ? 'validated' : 'needs-review'}`;
+        ui.qaAgrees.textContent = review.agrees === true ? 'Yes' : 'No';
+        ui.qaCategory.textContent = review.category;
+    }
+    if (typeof result.confidence === 'number') {
+        const min = result.rule_matched ? result.rule_matched.min_confidence : (pack ? pack.escalation.min_confidence : 1);
+        ui.qaConfidence.textContent = `${result.confidence.toFixed(2)} (min ${min.toFixed(2)})`;
+        ui.qaConfidence.className = `qa-value ${result.confidence >= min ? 'high' : 'low'}`;
+    }
+}
+
+function levelColor(pack, levelId) {
+    const level = pack.levels.find((l) => l.id === levelId);
+    return level ? colorOf(level.color) : 'gray';
+}
+
+// A failed request is shown as "needs human review". The UI never guesses a level.
+function displayClientError(message) {
+    ui.resultDecision.className = 'result-decision status-review';
+    ui.decisionLevel.textContent = 'NEEDS HUMAN REVIEW';
+    ui.decisionAction.replaceChildren(
+        make('div', 'decision-text', 'The request failed, so there is no decision. A person must sort this case.'),
+        make('div', 'interim-note', message),
+    );
+    ui.qaBadge.textContent = 'Not run';
+    ui.qaBadge.className = 'qa-badge needs-review';
+}
+
+// ---------- run ----------
+
+async function runAnalysis() {
+    if (!state.pack) return;
+    const text = ui.caseText.value;
+    if (!text.trim()) {
+        ui.caseText.focus();
+        return;
+    }
+
+    ui.analyzeBtn.disabled = true;
+    ui.analyzeBtn.textContent = 'Running Triage...';
+    resetAll();
+    state.startTime = Date.now();
+    ui.decisionLevel.textContent = 'ANALYZING...';
+    ui.decisionAction.textContent = 'Processing through workflow...';
+    addLog('orchestrator', 'Client', `POST /api/triage (pack: ${state.pack.id})`);
+
+    try {
+        const res = await fetch('/api/triage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                patient_id: scenario.patientId,
-                symptoms: scenario.text
-            })
+            body: JSON.stringify({ text, pack: state.pack.id }),
         });
-        
-        if (!response.ok) {
-            throw new Error(`Server error: ${response.status}`);
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            const detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail || {});
+            throw new Error(`Server error ${res.status}: ${detail}`);
         }
-        
-        const data = await response.json();
-        
-        const diagText = data.diagnosis.toUpperCase();
-        let level = 'GREEN';
-        if (diagText.includes('RED')) level = 'RED';
-        else if (diagText.includes('YELLOW')) level = 'YELLOW';
-        
-        await animateFlow(level, scenario);
-        displayDecision(level, data.plan, data.qa_review);
-        
+        const result = await res.json();
+        await animateSteps(result);
+        displayResult(result);
     } catch (error) {
-        console.error('Analysis error:', error);
-        addLog('decision', 'Error', error.message);
-        decisionLevel.textContent = 'ERROR';
-        decisionAction.textContent = `Analysis failed: ${error.message}`;
-        resultDecision.className = 'result-decision status-red';
+        console.error('Triage error:', error);
+        addLog('error', 'Error', error.message);
+        displayClientError(error.message);
     } finally {
-        analyzeBtn.disabled = false;
-        analyzeBtn.textContent = 'Run Triage Analysis';
+        ui.analyzeBtn.disabled = false;
+        ui.analyzeBtn.textContent = 'Run Triage';
     }
 }
 
-// Event Listeners
-scenarioSelect.addEventListener('change', updateScenario);
-analyzeBtn.addEventListener('click', runAnalysis);
+// ---------- start ----------
 
-// Initialize
-updateScenario();
+ui.packSelect.addEventListener('change', () => selectPack(ui.packSelect.value));
+ui.exampleSelect.addEventListener('change', selectExample);
+ui.caseText.addEventListener('input', () => {
+    if (ui.exampleSelect.value !== 'custom') ui.exampleSelect.value = 'custom';
+});
+ui.analyzeBtn.addEventListener('click', runAnalysis);
+
+loadHealth();
+loadPacks();

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peakwhale™ Trident | AI Medical Triage</title>
+    <title>Peakwhale™ Trident | AI + Rules Triage</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -19,13 +19,19 @@
                 <span class="product-name">TRIDENT</span>
             </div>
             <div class="header-meta">
-                <span class="header-desc">Autonomous Medical Triage System</span>
+                <span class="header-desc">Fail-safe AI + Rules Triage Engine</span>
                 <div class="system-status">
-                    <span class="status-light"></span>
-                    <span class="status-text">System Online</span>
+                    <span class="status-light" id="status-light"></span>
+                    <span class="status-text" id="status-text">Connecting...</span>
                 </div>
             </div>
         </header>
+
+        <!-- Shown for packs with a disclaimer, like the medical demo -->
+        <div class="disclaimer-banner" id="disclaimer-banner" hidden>
+            <span class="disclaimer-tag">Important</span>
+            <span class="disclaimer-text" id="disclaimer-text"></span>
+        </div>
 
         <!-- Main Content -->
         <main>
@@ -42,17 +48,17 @@
                         <div class="layer-label">Entry Point</div>
                         <div class="layer-content">
                             <div class="arch-block input-block" id="block-input">
-                                <div class="block-header">Patient Data</div>
-                                <div class="block-desc">ID, symptoms, statement</div>
+                                <div class="block-header">Case Input</div>
+                                <div class="block-desc">Free text + rule pack</div>
                                 <div class="block-status" id="status-input">Waiting</div>
                             </div>
-                            
+
                             <div class="flow-arrow">→</div>
-                            
+
                             <div class="arch-block orchestrator-block" id="block-orchestrator">
                                 <div class="block-tag">LangGraph</div>
                                 <div class="block-header">Workflow Engine</div>
-                                <div class="block-desc">State machine orchestration</div>
+                                <div class="block-desc">State machine with a fail-safe gate</div>
                                 <div class="block-status" id="status-orchestrator">Idle</div>
                             </div>
                         </div>
@@ -62,169 +68,162 @@
                     <div class="arch-layer nodes-layer">
                         <div class="layer-label">LangGraph Nodes (State Flow)</div>
                         <div class="layer-content nodes-content">
-                            <!-- Node 1: Gather Context -->
                             <div class="node-group">
-                                <div class="arch-block node-block" id="block-node-context">
+                                <div class="arch-block node-block" id="block-node-validate_input">
                                     <div class="block-tag node-tag">Node 1</div>
-                                    <div class="block-header">gather_context</div>
-                                    <div class="block-desc">Retrieves patient history & treatment rules</div>
-                                    <div class="block-status" id="status-node-context">Pending</div>
+                                    <div class="block-header">validate_input</div>
+                                    <div class="block-desc">Empty or too long goes to a human</div>
+                                    <div class="block-status" id="status-node-validate_input">Pending</div>
+                                </div>
+                            </div>
+
+                            <div class="flow-arrow node-arrow">→</div>
+
+                            <div class="node-group">
+                                <div class="arch-block node-block" id="block-node-screen_rules">
+                                    <div class="block-tag node-tag">Node 2</div>
+                                    <div class="block-header">screen_rules</div>
+                                    <div class="block-desc">Red-flag word rules (no AI)</div>
+                                    <div class="block-status" id="status-node-screen_rules">Pending</div>
                                 </div>
                                 <div class="node-calls">
-                                    <div class="call-item" id="call-patient-record">
+                                    <div class="call-item" id="call-escalation">
                                         <span class="call-arrow">↓</span>
-                                        <span class="call-name">get_patient_record()</span>
-                                    </div>
-                                    <div class="call-item" id="call-treatment">
-                                        <span class="call-arrow">↓</span>
-                                        <span class="call-name">get_treatment_considerations()</span>
+                                        <span class="call-name">escalation.rules</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="flow-arrow node-arrow">→</div>
 
-                            <!-- Node 2: Medical Board -->
-                            <div class="node-group medical-board-group">
-                                <div class="arch-block node-block" id="block-node-medical">
-                                    <div class="block-tag node-tag">Node 2</div>
-                                    <div class="block-header">medical_board</div>
-                                    <div class="block-desc">AI agents analyze symptoms</div>
-                                    <div class="block-status" id="status-node-medical">Pending</div>
+                            <div class="node-group">
+                                <div class="arch-block node-block" id="block-node-classify">
+                                    <div class="block-tag node-tag">Node 3</div>
+                                    <div class="block-header">classify</div>
+                                    <div class="block-desc">LLM picks one category</div>
+                                    <div class="block-status" id="status-node-classify">Pending</div>
                                 </div>
                                 <div class="agents-box">
-                                    <div class="agent-item" id="agent-nurse">
-                                        <div class="agent-tag">CrewAI + Llama 3.1</div>
-                                        <div class="agent-name">Triage Nurse</div>
-                                        <div class="agent-desc">Calls tools, gathers data</div>
-                                    </div>
-                                    <div class="agent-arrow">→</div>
-                                    <div class="agent-item" id="agent-doctor">
-                                        <div class="agent-tag">CrewAI + Llama 3.1</div>
-                                        <div class="agent-name">ER Physician</div>
-                                        <div class="agent-desc">Reviews, decides level</div>
+                                    <div class="agent-item" id="agent-classifier">
+                                        <div class="agent-tag" id="agent-classifier-model">LLM · JSON schema</div>
+                                        <div class="agent-name">Classifier</div>
+                                        <div class="agent-desc">category, confidence, evidence</div>
                                     </div>
                                 </div>
                                 <div class="node-calls">
-                                    <div class="call-item" id="call-guidelines">
+                                    <div class="call-item" id="call-schema">
                                         <span class="call-arrow">↓</span>
-                                        <span class="call-name">get_triage_guidelines()</span>
+                                        <span class="call-name">schema check, 1 retry</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="flow-arrow node-arrow">→</div>
 
-                            <!-- Node 3: Router -->
                             <div class="node-group">
-                                <div class="arch-block node-block router-block" id="block-node-router">
-                                    <div class="block-tag node-tag">Router</div>
-                                    <div class="block-header">route_logic</div>
-                                    <div class="block-desc">Conditional edge based on diagnosis</div>
-                                    <div class="block-status" id="status-node-router">Pending</div>
+                                <div class="arch-block node-block router-block" id="block-node-apply_rules">
+                                    <div class="block-tag node-tag">Node 4</div>
+                                    <div class="block-header">apply_rules</div>
+                                    <div class="block-desc">Category to level (no AI)</div>
+                                    <div class="block-status" id="status-node-apply_rules">Pending</div>
+                                </div>
+                                <div class="node-calls">
+                                    <div class="call-item" id="call-pack">
+                                        <span class="call-arrow">↓</span>
+                                        <span class="call-name">pack.categories</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flow-arrow node-arrow">→</div>
+
+                            <div class="node-group">
+                                <div class="arch-block node-block" id="block-node-review">
+                                    <div class="block-tag node-tag">Node 5</div>
+                                    <div class="block-header">review</div>
+                                    <div class="block-desc">Independent second check</div>
+                                    <div class="block-status" id="status-node-review">Pending</div>
+                                </div>
+                                <div class="agents-box review-agents">
+                                    <div class="agent-item" id="agent-reviewer">
+                                        <div class="agent-tag review-agent-tag" id="agent-reviewer-model">LLM · separate prompt</div>
+                                        <div class="agent-name">Reviewer</div>
+                                        <div class="agent-desc">agrees: true / false</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Layer 3: MCP Tools & Databases -->
+                    <!-- Layer 3: Rules & Data -->
                     <div class="arch-layer tools-layer">
-                        <div class="layer-label">MCP Tools & Data Layer</div>
+                        <div class="layer-label">Rules &amp; Data Layer</div>
                         <div class="layer-content tools-content">
-                            <div class="tool-group">
-                                <div class="arch-block tool-block" id="block-tool-patient">
-                                    <div class="block-tag tool-tag">MCP Tool</div>
-                                    <div class="block-header">Patient Lookup</div>
-                                    <div class="block-status" id="status-tool-patient">Ready</div>
+                            <div class="tool-group" id="group-pack">
+                                <div class="arch-block tool-block" id="block-tool-pack">
+                                    <div class="block-tag tool-tag">Rule Pack</div>
+                                    <div class="block-header">Categories &amp; Levels</div>
+                                    <div class="block-status" id="status-tool-pack">Ready</div>
                                 </div>
                                 <div class="db-arrow">↔</div>
-                                <div class="arch-block db-block" id="block-db-patient">
-                                    <div class="block-tag db-tag">Database</div>
-                                    <div class="block-header">Patient EMR</div>
+                                <div class="arch-block db-block" id="block-db-pack">
+                                    <div class="block-tag db-tag">YAML</div>
+                                    <div class="block-header" id="db-pack-name">-</div>
                                 </div>
                             </div>
 
-                            <div class="tool-group">
-                                <div class="arch-block tool-block" id="block-tool-treatment">
-                                    <div class="block-tag tool-tag">MCP Tool</div>
-                                    <div class="block-header">Treatment Rules</div>
-                                    <div class="block-status" id="status-tool-treatment">Ready</div>
+                            <div class="tool-group" id="group-escalation">
+                                <div class="arch-block tool-block" id="block-tool-escalation">
+                                    <div class="block-tag tool-tag">Rule Pack</div>
+                                    <div class="block-header">Escalation Rules</div>
+                                    <div class="block-status" id="status-tool-escalation">Ready</div>
                                 </div>
                                 <div class="db-arrow">↔</div>
-                                <div class="arch-block db-block" id="block-db-treatment">
-                                    <div class="block-tag db-tag">Database</div>
-                                    <div class="block-header">Contraindications</div>
+                                <div class="arch-block db-block" id="block-db-escalation">
+                                    <div class="block-tag db-tag">YAML</div>
+                                    <div class="block-header">Red-flag words</div>
                                 </div>
                             </div>
 
-                            <div class="tool-group">
-                                <div class="arch-block tool-block" id="block-tool-guidelines">
-                                    <div class="block-tag tool-tag">MCP Tool</div>
-                                    <div class="block-header">Guideline Search</div>
-                                    <div class="block-status" id="status-tool-guidelines">Ready</div>
+                            <div class="tool-group" id="group-audit">
+                                <div class="arch-block tool-block" id="block-tool-audit">
+                                    <div class="block-tag tool-tag">Audit</div>
+                                    <div class="block-header">Audit Trail</div>
+                                    <div class="block-status" id="status-tool-audit">Ready</div>
                                 </div>
                                 <div class="db-arrow">↔</div>
-                                <div class="arch-block db-block" id="block-db-guidelines">
-                                    <div class="block-tag db-tag">Database</div>
-                                    <div class="block-header">Triage Protocols</div>
+                                <div class="arch-block db-block" id="block-db-audit">
+                                    <div class="block-tag db-tag">JSONL</div>
+                                    <div class="block-header">Steps, models, timings</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Layer 4: Action Nodes -->
+                    <!-- Layer 4: Levels from the selected rule pack -->
                     <div class="arch-layer output-layer">
-                        <div class="layer-label">Action Nodes (CrewAI Decision)</div>
-                        <div class="layer-content output-content">
-                            <div class="arch-block action-block red-action" id="block-action-red">
-                                <div class="block-tag action-tag">Node</div>
-                                <div class="block-header">emergency</div>
-                                <div class="block-desc">Dispatch ambulance + treatment notes</div>
-                            </div>
-                            <div class="arch-block action-block yellow-action" id="block-action-yellow">
-                                <div class="block-tag action-tag">Node</div>
-                                <div class="block-header">urgent</div>
-                                <div class="block-desc">Urgent care + treatment notes</div>
-                            </div>
-                            <div class="arch-block action-block green-action" id="block-action-green">
-                                <div class="block-tag action-tag">Node</div>
-                                <div class="block-header">routine</div>
-                                <div class="block-desc">Home care + treatment notes</div>
-                            </div>
-                        </div>
+                        <div class="layer-label">Action Levels (from Rule Pack)</div>
+                        <div class="layer-content output-content" id="level-blocks"></div>
                     </div>
 
-                    <!-- Layer 5: AutoGen QA Review -->
+                    <!-- Layer 5: Fail-safe gate -->
                     <div class="arch-layer qa-layer">
-                        <div class="layer-label">Quality Assurance (AutoGen Validation)</div>
+                        <div class="layer-label">Fail-safe Gate</div>
                         <div class="layer-content qa-content">
                             <div class="qa-flow-arrow">↓</div>
                             <div class="node-group qa-group">
-                                <div class="arch-block node-block qa-block" id="block-qa-review">
-                                    <div class="block-tag autogen-tag">AutoGen</div>
-                                    <div class="block-header">qa_review</div>
-                                    <div class="block-desc">Second-opinion validation of triage decision</div>
-                                    <div class="block-status" id="status-qa-review">Pending</div>
-                                </div>
-                                <div class="agents-box autogen-agents">
-                                    <div class="agent-item" id="agent-qa-reviewer">
-                                        <div class="agent-tag autogen-agent-tag">AutoGen + Llama 3.1</div>
-                                        <div class="agent-name">QA Reviewer</div>
-                                        <div class="agent-desc">Checks protocol compliance</div>
-                                    </div>
-                                    <div class="agent-arrow">→</div>
-                                    <div class="agent-item" id="agent-auditor">
-                                        <div class="agent-tag autogen-agent-tag">AutoGen + Llama 3.1</div>
-                                        <div class="agent-name">Clinical Auditor</div>
-                                        <div class="agent-desc">Validates & scores confidence</div>
-                                    </div>
+                                <div class="arch-block node-block qa-block" id="block-node-decide">
+                                    <div class="block-tag gate-tag">Gate</div>
+                                    <div class="block-header">decide</div>
+                                    <div class="block-desc">DECIDED only if every check passed. Anything else: human review.</div>
+                                    <div class="block-status" id="status-node-decide">Pending</div>
                                 </div>
                             </div>
                             <div class="qa-flow-arrow">↓</div>
                             <div class="arch-block output-block" id="block-output">
                                 <div class="block-tag output-tag">Output</div>
                                 <div class="block-header">Final Decision</div>
-                                <div class="block-desc">Triage level + action plan + QA validation</div>
+                                <div class="block-desc">Level + action + team, or NEEDS HUMAN REVIEW</div>
                             </div>
                         </div>
                     </div>
@@ -236,42 +235,48 @@
                 <!-- Left: Input Controls -->
                 <div class="panel input-panel">
                     <div class="panel-header">
-                        <h3>Patient Case Input</h3>
+                        <h3>Case Input</h3>
                     </div>
                     <div class="panel-content">
                         <div class="form-group">
-                            <label>Clinical Scenario</label>
-                            <select id="scenario-select">
-                                <option value="cardiac">Acute Cardiac Event (Expected: RED)</option>
-                                <option value="respiratory">Respiratory Distress (Expected: YELLOW)</option>
-                                <option value="dermatology">Dermatological Issue (Expected: GREEN)</option>
+                            <label for="pack-select">Rule Pack</label>
+                            <select id="pack-select" disabled>
+                                <option>Loading rule packs...</option>
                             </select>
                         </div>
 
-                        <div class="patient-card">
-                            <div class="patient-row">
-                                <span class="patient-label">Patient ID</span>
-                                <span class="patient-value" id="display-patient-id">P-101</span>
+                        <div class="info-card">
+                            <div class="info-row">
+                                <span class="info-label">Pack</span>
+                                <span class="info-value" id="display-pack-id">-</span>
                             </div>
-                            <div class="patient-row">
-                                <span class="patient-label">Name</span>
-                                <span class="patient-value" id="display-patient-name">Sarah Connor</span>
+                            <div class="info-row">
+                                <span class="info-label">Levels</span>
+                                <span class="info-value" id="display-pack-levels">-</span>
                             </div>
-                            <div class="patient-row">
-                                <span class="patient-label">Medical History</span>
-                                <span class="patient-value" id="display-patient-history">Hypertension, Penicillin Allergy</span>
+                            <div class="info-row">
+                                <span class="info-label">Categories</span>
+                                <span class="info-value" id="display-pack-categories">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Min. confidence</span>
+                                <span class="info-value" id="display-pack-confidence">-</span>
                             </div>
                         </div>
 
                         <div class="form-group">
-                            <label>Patient Statement</label>
-                            <div class="statement-box" id="symptoms-text">
-                                Select a scenario to view patient statement...
-                            </div>
+                            <label for="example-select">Example Case</label>
+                            <select id="example-select" disabled></select>
                         </div>
 
-                        <button id="analyze-btn" class="primary-btn">
-                            Run Triage Analysis
+                        <div class="form-group">
+                            <label for="case-text">Case Text</label>
+                            <textarea id="case-text" class="statement-box case-textarea" rows="5" maxlength="8000"
+                                placeholder="Type or paste the text to sort..."></textarea>
+                        </div>
+
+                        <button id="analyze-btn" class="primary-btn" disabled>
+                            Run Triage
                         </button>
                     </div>
                 </div>
@@ -299,7 +304,7 @@
                     <div class="panel-content">
                         <div class="result-protocol" id="result-protocol">
                             <div class="protocol-empty">
-                                Protocol match will display after analysis.
+                                The matched rule will display after analysis.
                             </div>
                         </div>
 
@@ -310,19 +315,23 @@
                             </div>
                         </div>
 
-                        <!-- AutoGen QA Review Result -->
+                        <!-- Independent review result -->
                         <div class="qa-result" id="qa-result">
                             <div class="qa-header">
-                                <span class="qa-label">AutoGen QA Review</span>
+                                <span class="qa-label">Independent Review</span>
                                 <span class="qa-badge" id="qa-badge">Pending</span>
                             </div>
                             <div class="qa-details">
                                 <div class="qa-row">
-                                    <span class="qa-field">Validated:</span>
-                                    <span class="qa-value" id="qa-validated">-</span>
+                                    <span class="qa-field">Reviewer agrees:</span>
+                                    <span class="qa-value" id="qa-agrees">-</span>
                                 </div>
                                 <div class="qa-row">
-                                    <span class="qa-field">Confidence:</span>
+                                    <span class="qa-field">Reviewer category:</span>
+                                    <span class="qa-value" id="qa-category">-</span>
+                                </div>
+                                <div class="qa-row">
+                                    <span class="qa-field">Classifier confidence:</span>
                                     <span class="qa-value" id="qa-confidence">-</span>
                                 </div>
                             </div>
@@ -334,9 +343,11 @@
 
         <!-- Footer -->
         <footer>
-            <span class="footer-text">Peakwhale™ Trident v0.1.0</span>
+            <span class="footer-text" id="footer-version">Peakwhale™ Trident</span>
             <span class="footer-divider">|</span>
-            <span class="footer-tech">LangGraph · CrewAI · AutoGen · Llama 3.1 · MCP</span>
+            <span class="footer-tech">LangGraph · Ollama / OpenAI-compatible · YAML Rule Packs · MCP</span>
+            <span class="footer-divider">|</span>
+            <span class="footer-text">Not for clinical use</span>
         </footer>
     </div>
 

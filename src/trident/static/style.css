@@ -128,12 +128,51 @@ header {
     box-shadow: 0 0 8px var(--status-green);
 }
 
+.status-light.offline {
+    background: var(--status-red);
+    box-shadow: 0 0 8px var(--status-red);
+}
+
+.status-light.offline + .status-text {
+    color: var(--status-red);
+}
+
 .status-text {
     font-family: var(--font-mono);
     font-size: 10px;
     color: var(--status-green);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+/* Disclaimer banner (packs with a disclaimer, like the medical demo) */
+.disclaimer-banner {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: var(--status-red-dim);
+    border: 1px solid var(--status-red);
+    border-radius: var(--radius);
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.disclaimer-banner[hidden] {
+    display: none;
+}
+
+.disclaimer-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--status-red);
+    color: var(--bg-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
 }
 
 /* Main */
@@ -466,23 +505,56 @@ main {
     opacity: 1;
 }
 
-.red-action.active {
+.level-red { --level: var(--status-red); --level-dim: var(--status-red-dim); }
+.level-orange { --level: var(--tag-orange); --level-dim: var(--tag-orange-dim); }
+.level-yellow { --level: var(--status-yellow); --level-dim: var(--status-yellow-dim); }
+.level-green { --level: var(--status-green); --level-dim: var(--status-green-dim); }
+.level-blue { --level: var(--accent-blue); --level-dim: var(--accent-blue-dim); }
+.level-gray { --level: var(--text-secondary); --level-dim: rgba(139, 148, 158, 0.15); }
+.review-action { --level: var(--tag-purple); --level-dim: var(--tag-purple-dim); }
+
+.action-block.active {
+    border-color: var(--level);
+    box-shadow: 0 0 15px var(--level-dim);
+}
+.action-block.active .block-header { color: var(--level); }
+
+/* The "treat as" level while a case waits for a person */
+.action-block.active.interim {
+    border-style: dashed;
+    box-shadow: none;
+}
+
+.review-action {
+    border-style: dashed;
+}
+
+/* Step result on node blocks */
+.arch-block.step-escalated {
+    border-color: var(--tag-orange);
+    box-shadow: 0 0 0 1px var(--tag-orange), 0 0 15px var(--tag-orange-dim);
+}
+.arch-block.step-escalated .block-status {
+    background: var(--tag-orange-dim);
+    color: var(--tag-orange);
+}
+.arch-block.step-error {
     border-color: var(--status-red);
-    box-shadow: 0 0 15px var(--status-red-dim);
+    box-shadow: 0 0 0 1px var(--status-red), 0 0 15px var(--status-red-dim);
 }
-.red-action.active .block-header { color: var(--status-red); }
-
-.yellow-action.active {
-    border-color: var(--status-yellow);
-    box-shadow: 0 0 15px var(--status-yellow-dim);
+.arch-block.step-error .block-status {
+    background: var(--status-red-dim);
+    color: var(--status-red);
 }
-.yellow-action.active .block-header { color: var(--status-yellow); }
-
-.green-action.active {
-    border-color: var(--status-green);
-    box-shadow: 0 0 15px var(--status-green-dim);
+.arch-block.step-skipped {
+    opacity: 0.6;
+    box-shadow: none;
+    border-color: var(--border-primary);
 }
-.green-action.active .block-header { color: var(--status-green); }
+.arch-block.step-skipped .block-status {
+    background: var(--bg-primary);
+    color: var(--text-muted);
+}
 
 /* Control Section */
 .control-section {
@@ -563,30 +635,30 @@ main {
     border-color: var(--accent-blue);
 }
 
-.patient-card {
+.info-card {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-secondary);
     border-radius: var(--radius-sm);
     padding: 10px;
 }
 
-.patient-row {
+.info-row {
     display: flex;
     justify-content: space-between;
     padding: 5px 0;
     border-bottom: 1px solid var(--border-secondary);
 }
 
-.patient-row:last-child {
+.info-row:last-child {
     border-bottom: none;
 }
 
-.patient-label {
+.info-label {
     font-size: 10px;
     color: var(--text-muted);
 }
 
-.patient-value {
+.info-value {
     font-size: 11px;
     color: var(--text-primary);
     font-family: var(--font-mono);
@@ -601,6 +673,19 @@ main {
     line-height: 1.5;
     color: var(--text-secondary);
     min-height: 70px;
+}
+
+.case-textarea {
+    width: 100%;
+    resize: vertical;
+    font-family: var(--font-sans);
+    min-height: 110px;
+}
+
+.case-textarea:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    color: var(--text-primary);
 }
 
 .primary-btn {
@@ -665,7 +750,9 @@ main {
 .log-entry.tool { border-left-color: var(--tag-orange); }
 .log-entry.data { border-left-color: var(--status-green); }
 .log-entry.decision { border-left-color: var(--status-red); }
-.log-entry.autogen { border-left-color: var(--tag-purple); }
+.log-entry.review { border-left-color: var(--tag-purple); }
+.log-entry.warn { border-left-color: var(--tag-orange); }
+.log-entry.error { border-left-color: var(--status-red); }
 
 .log-time {
     color: var(--text-muted);
@@ -683,7 +770,9 @@ main {
 .log-entry.tool .log-source { color: var(--tag-orange); }
 .log-entry.data .log-source { color: var(--status-green); }
 .log-entry.decision .log-source { color: var(--status-red); }
-.log-entry.autogen .log-source { color: var(--tag-purple); }
+.log-entry.review .log-source { color: var(--tag-purple); }
+.log-entry.warn .log-source { color: var(--tag-orange); }
+.log-entry.error .log-source { color: var(--status-red); }
 
 .log-message {
     color: var(--text-secondary);
@@ -720,6 +809,10 @@ main {
 .protocol-card.red { border-left-color: var(--status-red); }
 .protocol-card.yellow { border-left-color: var(--status-yellow); }
 .protocol-card.green { border-left-color: var(--status-green); }
+.protocol-card.orange { border-left-color: var(--tag-orange); }
+.protocol-card.blue { border-left-color: var(--accent-blue); }
+.protocol-card.gray { border-left-color: var(--text-secondary); }
+.protocol-card.review { border-left-color: var(--tag-purple); }
 
 .protocol-title {
     font-family: var(--font-mono);
@@ -733,6 +826,15 @@ main {
 .protocol-card.red .protocol-title { color: var(--status-red); }
 .protocol-card.yellow .protocol-title { color: var(--status-yellow); }
 .protocol-card.green .protocol-title { color: var(--status-green); }
+.protocol-card.orange .protocol-title { color: var(--tag-orange); }
+.protocol-card.blue .protocol-title { color: var(--accent-blue); }
+.protocol-card.gray .protocol-title { color: var(--text-secondary); }
+.protocol-card.review .protocol-title { color: var(--tag-purple); }
+
+.evidence-quote {
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
 
 .protocol-text {
     font-size: 11px;
@@ -837,13 +939,61 @@ main {
     color: var(--status-green);
 }
 
+.result-decision.status-orange .decision-level {
+    background: var(--tag-orange-dim);
+    color: var(--tag-orange);
+}
+
+.result-decision.status-blue .decision-level {
+    background: var(--accent-blue-dim);
+    color: var(--accent-blue);
+}
+
+.result-decision.status-gray .decision-level {
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+}
+
+.result-decision.status-review .decision-level {
+    background: var(--tag-purple-dim);
+    color: var(--tag-purple);
+    border: 1px dashed var(--tag-purple);
+    font-size: 15px;
+}
+
 .decision-action {
     font-size: 11px;
     color: var(--text-secondary);
     line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-/* AutoGen QA Review Result */
+.decision-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-primary);
+}
+
+.interim-note {
+    font-size: 10px;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--tag-purple-dim);
+    color: var(--tag-purple);
+}
+
+.reasons-card {
+    border-left-color: var(--tag-purple);
+}
+
+.reasons-card .treatment-title,
+.reasons-card .treatment-bullet {
+    color: var(--tag-purple);
+}
+
+/* Independent Review Result */
 .qa-result {
     background: var(--bg-tertiary);
     border-radius: var(--radius-sm);
@@ -912,7 +1062,7 @@ main {
 .qa-value.medium { color: var(--status-yellow); }
 .qa-value.low { color: var(--status-red); }
 
-/* AutoGen Architecture Styles */
+/* Fail-safe Gate Styles */
 .qa-layer {
     border-top: 1px dashed var(--tag-purple);
     padding-top: 12px;
@@ -942,18 +1092,23 @@ main {
     border-color: var(--tag-purple) !important;
 }
 
-.autogen-tag {
+.gate-tag {
     background: var(--tag-purple-dim) !important;
+    border: 1px solid var(--tag-purple);
     color: var(--tag-purple) !important;
 }
 
-.autogen-agents {
+.review-agents {
     border-color: var(--tag-purple);
 }
 
-.autogen-agent-tag {
-    background: var(--tag-purple-dim) !important;
+.review-agent-tag {
     color: var(--tag-purple) !important;
+}
+
+#agent-reviewer.active {
+    border-color: var(--tag-purple);
+    box-shadow: 0 0 10px var(--tag-purple-dim);
 }
 
 .output-block {
