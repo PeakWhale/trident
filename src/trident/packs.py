@@ -76,6 +76,7 @@ class Category(_Strict):
     level: str
     route_to: str | None = None
     # Optional: a stricter confidence limit for this category only.
+    # A value below the pack's limit has no effect.
     min_confidence: float | None = Field(default=None, ge=0, le=1)
     # Optional: always send this category to a human.
     always_human_review: bool = False
