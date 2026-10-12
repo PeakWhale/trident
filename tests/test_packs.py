@@ -115,6 +115,43 @@ def test_json_packs_work(tmp_path):
     assert load_pack(path).id == "test-pack"
 
 
+def test_tab_indented_json_pack(tmp_path):
+    path = tmp_path / "tab.json"
+    path.write_text(json.dumps(BASE, indent="\t"))
+    assert load_pack(path).id == "test-pack"
+
+
+def test_json_pack_with_emoji_written_by_json_dump(tmp_path):
+    """json.dump writes an emoji as an escaped surrogate pair by default."""
+    data = copy.deepcopy(BASE)
+    data["examples"][0]["text"] = "\U0001F621 refund now"
+    data["escalation"]["rules"][0]["words"].append("\U0001F525")
+    path = tmp_path / "emoji.json"
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(data, handle)
+    assert "\\ud83d" in path.read_text(encoding="utf-8")
+
+    pack = load_pack(path)
+    assert pack.examples[0].text == "\U0001F621 refund now"
+    pack.examples[0].text.encode("utf-8")  # no lone surrogates
+    assert pack.escalation.rules[0].find("the server is on \U0001F525") == ["\U0001F525"]
+    json.dumps(pack.model_dump(mode="json"), ensure_ascii=False).encode("utf-8")
+
+
+def test_broken_json_pack_says_json(tmp_path):
+    path = tmp_path / "broken.json"
+    path.write_text('{"id": "x",}')
+    with pytest.raises(PackError, match="not valid JSON"):
+        load_pack(path)
+
+
+def test_lone_surrogate_is_rejected():
+    raw = pack_with().replace("The bin is on fire", "The bin is on fire \\ud83d")
+    raw = raw.replace("text: The bin is on fire \\ud83d", 'text: "The bin is on fire \\ud83d"')
+    with pytest.raises(PackError, match="examples.0.text has an invalid character"):
+        parse_pack(raw, source="test.yaml")
+
+
 def test_missing_file(tmp_path):
     with pytest.raises(PackError, match="can not read"):
         load_pack(tmp_path / "missing.yaml")

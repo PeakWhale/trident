@@ -14,6 +14,7 @@ lives in the pack.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from collections.abc import Iterable
@@ -245,18 +246,29 @@ def load_pack(path: str | Path) -> RulePack:
     path = Path(path)
     try:
         raw = path.read_text(encoding="utf-8")
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
         raise PackError(f"{path}: can not read file ({exc})") from exc
     return parse_pack(raw, source=str(path))
 
 
-def parse_pack(raw: str, source: str = "<text>") -> RulePack:
+def parse_pack(raw: str, source: str = "<text>", fmt: Literal["yaml", "json"] | None = None) -> RulePack:
+    """Parse and validate a rule pack. The format comes from `fmt`, else from the
+    file name in `source` (.json is JSON, anything else is YAML)."""
+    if fmt is None:
+        fmt = "json" if source.lower().endswith(".json") else "yaml"
     try:
-        data = yaml.safe_load(raw)
+        # JSON goes to a real JSON parser: YAML 1.1 rejects tabs and turns
+        # escaped emoji (\ud83d\ude21) into two broken characters.
+        data = json.loads(raw) if fmt == "json" else yaml.safe_load(raw)
+    except json.JSONDecodeError as exc:
+        raise PackError(f"{source}: not valid JSON ({exc})") from exc
     except yaml.YAMLError as exc:
-        raise PackError(f"{source}: not valid YAML/JSON ({exc})") from exc
+        raise PackError(f"{source}: not valid YAML ({exc})") from exc
     if not isinstance(data, dict):
         raise PackError(f"{source}: a rule pack must be a mapping at the top level")
+    bad = _broken_text(data)
+    if bad is not None:
+        raise PackError(f"{source}: {bad} has an invalid character (a lone surrogate, often a broken emoji escape)")
     try:
         return RulePack.model_validate(data)
     except ValidationError as exc:
@@ -264,6 +276,26 @@ def parse_pack(raw: str, source: str = "<text>") -> RulePack:
             f"{'.'.join(str(p) for p in err['loc']) or 'pack'}: {err['msg']}" for err in exc.errors()
         )
         raise PackError(f"{source}: invalid rule pack - {problems}") from exc
+
+
+def _broken_text(data: Any, where: str = "pack") -> str | None:
+    """The place of the first text that can not be written as UTF-8, or None."""
+    if isinstance(data, str):
+        try:
+            data.encode("utf-8")
+        except UnicodeEncodeError:
+            return where
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            found = _broken_text(key, where) or _broken_text(value, f"{where}.{key}")
+            if found:
+                return found
+    elif isinstance(data, list):
+        for index, value in enumerate(data):
+            found = _broken_text(value, f"{where}.{index}")
+            if found:
+                return found
+    return None
 
 
 def builtin_pack_files() -> list[Path]:
