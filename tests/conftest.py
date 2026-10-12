@@ -29,9 +29,14 @@ def make_engine(registry):
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
-    """Tests must not depend on the developer's own TRIDENT_* settings."""
+    """Tests must not depend on the developer's own TRIDENT_* settings or .env file."""
     import os
+
+    import trident.cli
+    import trident.config
 
     for key in list(os.environ):
         if key.startswith("TRIDENT_") or key == "OPENAI_API_KEY":
             monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(trident.config, "load_dotenv_if_present", lambda: None)
+    monkeypatch.setattr(trident.cli, "load_dotenv_if_present", lambda: None)

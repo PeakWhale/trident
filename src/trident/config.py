@@ -67,9 +67,14 @@ class Settings:
 
 
 def load_dotenv_if_present() -> None:
-    """Load a .env file from the current folder, if python-dotenv finds one."""
+    """Load a .env file from the current folder (or the nearest parent folder
+    that has one). Variables that are already set win."""
     try:
-        from dotenv import load_dotenv
+        from dotenv import find_dotenv, load_dotenv
     except ImportError:  # pragma: no cover - optional
         return
-    load_dotenv(override=False)
+    # usecwd=True: without it, python-dotenv searches from this file's folder
+    # (site-packages when installed), not from where the user runs trident.
+    path = find_dotenv(usecwd=True)
+    if path:
+        load_dotenv(path, override=False)

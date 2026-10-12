@@ -8,6 +8,8 @@ import httpx
 import pytest
 
 from trident.config import Settings
+# Kept before the autouse fixture in conftest.py swaps it for a no-op.
+from trident.config import load_dotenv_if_present as REAL_LOAD_DOTENV
 from trident.engine import TriageEngine
 from trident.llm import LLMError, OllamaClient, OpenAICompatibleClient, client_from_settings
 
@@ -119,6 +121,21 @@ def test_settings_openai_compatible():
 def test_bad_settings_fail_loudly(env):
     with pytest.raises(ValueError):
         Settings.from_env(env)
+
+
+def test_dotenv_is_read_from_the_current_folder(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text("TRIDENT_LLM_MODEL=from-cwd-dotenv\nTRIDENT_REVIEW_MODEL=from-cwd-review\n")
+    monkeypatch.chdir(tmp_path)
+    # Make monkeypatch restore (remove) these after the test.
+    for key in ("TRIDENT_LLM_MODEL", "TRIDENT_REVIEW_MODEL"):
+        monkeypatch.setenv(key, "placeholder")
+        monkeypatch.delenv(key)
+    monkeypatch.setenv("TRIDENT_REVIEW_MODEL", "already-set")
+
+    REAL_LOAD_DOTENV()
+    settings = Settings.from_env()
+    assert settings.model == "from-cwd-dotenv"
+    assert settings.review_model == "already-set"  # the environment wins over .env
 
 
 def test_separate_review_model():
