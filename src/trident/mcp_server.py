@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 
 from . import __version__
 from .engine import TriageEngine
-from .packs import PackNotFoundError
+from .packs import PackError, PackNotFoundError
 
 INSTRUCTIONS = """\
 PeakWhale Trident sorts text (tickets, messages, reports) with an "AI plus rules" engine.
@@ -78,10 +78,16 @@ def main() -> None:
     from .config import load_dotenv_if_present
 
     load_dotenv_if_present()
-    # stdout is used by the MCP protocol, so logs go to stderr.
+    # stdout is used by the MCP protocol, so logs and errors go to stderr.
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
+    try:
+        # Build the engine now, so a broken rule pack or setting fails at start-up.
+        engine = TriageEngine.from_settings()
+    except (PackError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
     logging.getLogger("trident").info("Starting PeakWhale Trident MCP server %s", __version__)
-    build_server().run("stdio")
+    build_server(lambda: engine).run("stdio")
 
 
 if __name__ == "__main__":  # pragma: no cover

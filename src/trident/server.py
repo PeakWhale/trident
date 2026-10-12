@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,7 @@ from pydantic import BaseModel, Field
 from . import __version__
 from .engine import TriageEngine
 from .models import TriageResult
-from .packs import PackNotFoundError, RulePack
+from .packs import PackError, PackNotFoundError, RulePack
 
 STATIC_DIR = Path(__file__).parent / "static"
 MAX_REQUEST_CHARS = 50_000
@@ -84,11 +85,15 @@ def main(host: str | None = None, port: int | None = None) -> None:
     from .config import load_dotenv_if_present
 
     load_dotenv_if_present()
-    logging.basicConfig(level=os.environ.get("TRIDENT_LOG_LEVEL", "INFO"))
-    host = host or os.environ.get("TRIDENT_HOST", "127.0.0.1")
-    port = port or int(os.environ.get("TRIDENT_PORT", "8000"))
-    # Build the engine now, so a broken rule pack or setting fails at start-up.
-    app = create_app(TriageEngine.from_settings())
+    try:
+        logging.basicConfig(level=os.environ.get("TRIDENT_LOG_LEVEL", "INFO"))
+        host = host or os.environ.get("TRIDENT_HOST", "127.0.0.1")
+        port = port or int(os.environ.get("TRIDENT_PORT", "8000"))
+        # Build the engine now, so a broken rule pack or setting fails at start-up.
+        app = create_app(TriageEngine.from_settings())
+    except (PackError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
     print(f"PEAKWHALE TRIDENT {__version__} - open http://{'localhost' if host in ('0.0.0.0', '127.0.0.1') else host}:{port}")
     uvicorn.run(app, host=host, port=port)
 

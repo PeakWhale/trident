@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import pytest
 from fakes import FakeLLM, agree, classified
 from test_packs import pack_with
 
@@ -51,3 +52,42 @@ def test_triage_command_unknown_pack(registry, monkeypatch, capsys):
     monkeypatch.setattr(TriageEngine, "from_settings", classmethod(lambda cls, settings=None: engine))
     assert cli.main(["triage", "--pack", "nope", "text"]) == 2
     assert "Unknown rule pack" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("env", "argv", "message"),
+    [
+        ({"TRIDENT_PACKS_DIR": "/nonexistent-trident-packs"}, ["packs"], "rule pack folder does not exist"),
+        ({"TRIDENT_PACKS_DIR": "/nonexistent-trident-packs"}, ["triage", "--pack", "it-incidents", "hello"], "does not exist"),
+        ({"TRIDENT_PACKS_DIR": "/nonexistent-trident-packs"}, ["validate"], "does not exist"),
+        ({"TRIDENT_LLM_TIMEOUT": "abc"}, ["validate"], "TRIDENT_LLM_TIMEOUT must be a number"),
+        ({"TRIDENT_LLM_PROVIDER": "anthropic"}, ["triage", "--pack", "it-incidents", "hi"], "TRIDENT_LLM_PROVIDER"),
+    ],
+)
+def test_bad_settings_give_one_line_not_a_traceback(monkeypatch, capsys, env, argv, message):
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    assert cli.main(argv) == 1
+    captured = capsys.readouterr()
+    assert message in captured.err + captured.out
+    assert "Traceback" not in captured.err
+
+
+def test_broken_pack_in_folder_gives_one_line(tmp_path, monkeypatch, capsys):
+    (tmp_path / "broken.yaml").write_text(pack_with(categories__0__level="nope"))
+    monkeypatch.setenv("TRIDENT_PACKS_DIR", str(tmp_path))
+    assert cli.main(["packs"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("error: ") and "broken.yaml" in err and len(err.strip().splitlines()) == 1
+
+
+@pytest.mark.parametrize("module", ["server", "mcp_server"])
+def test_servers_stop_with_one_line_on_bad_settings(monkeypatch, capsys, module):
+    import importlib
+
+    target = importlib.import_module(f"trident.{module}")
+    monkeypatch.setenv("TRIDENT_PACKS_DIR", "/nonexistent-trident-packs")
+    with pytest.raises(SystemExit) as info:
+        target.main()
+    assert info.value.code == 1
+    assert "error: " in capsys.readouterr().err
