@@ -189,6 +189,26 @@ def test_unknown_category_needs_human_review(make_engine, pack):
     assert reviewer.calls == []
 
 
+def test_category_min_confidence_can_only_be_stricter(make_engine, registry):
+    from test_packs import pack_with
+
+    from trident.packs import PackRegistry, parse_pack
+
+    loose = parse_pack(pack_with(escalation__min_confidence=0.7, categories__1__min_confidence=0.1))
+    strict = parse_pack(pack_with(escalation__min_confidence=0.7, categories__1__min_confidence=0.9))
+    for test_pack, confidence, outcome in [(loose, 0.15, HUMAN_REVIEW), (loose, 0.7, DECIDED), (strict, 0.8, HUMAN_REVIEW)]:
+        engine = make_engine(
+            FakeLLM(classified("question", confidence, ["How do I"])),
+            FakeLLM(agree("question")),
+            packs=PackRegistry([test_pack]),
+        )
+        result = engine.triage("How do I reset it?", "test-pack")
+        assert result.outcome == outcome, (test_pack.categories[1].min_confidence, confidence)
+        if outcome == HUMAN_REVIEW:
+            assert result.level != test_pack.lowest_level
+            assert "below the minimum" in result.reasons[0]
+
+
 def test_low_confidence_needs_human_review(make_engine, pack):
     answer = classified("access_request", 0.55, ["read access"])
     engine = make_engine(FakeLLM(answer), FakeLLM())

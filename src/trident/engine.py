@@ -380,7 +380,8 @@ class TriageEngine:
             raise ValueError(f"category '{c['category']}' is not in the rule pack")
 
         reasons: list[str] = []
-        threshold = cat.min_confidence if cat.min_confidence is not None else pack.escalation.min_confidence
+        # A category limit can only make the check stricter, never looser.
+        threshold = max(cat.min_confidence or 0.0, pack.escalation.min_confidence)
         confidence_ok = c["confidence"] >= threshold
         if not confidence_ok:
             reasons.append(f"Confidence {c['confidence']:.2f} is below the minimum of {threshold:.2f}.")
