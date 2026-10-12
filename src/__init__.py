@@ -1,2 +1,0 @@
-# PEAKWHALE™ TRIDENT - Medical Triage System
-__version__ = "0.1.0"

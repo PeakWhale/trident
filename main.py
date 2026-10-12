@@ -1,17 +1,9 @@
-import sys
-import os
+"""Start the PEAKWHALE TRIDENT web UI and API.
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+Same as running `uv run trident serve`.
+"""
 
-from server import app
-import uvicorn
-
-def main():
-    print("🔱 Starting Trident Medical Triage System...")
-    print("🌐 Server will be available at http://0.0.0.0:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
+from trident.server import main
 
 if __name__ == "__main__":
     main()
