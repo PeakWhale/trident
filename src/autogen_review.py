@@ -5,6 +5,7 @@ Uses Microsoft AutoGen to provide a second-opinion validation
 of the CrewAI triage decision. This demonstrates multi-framework
 orchestration where two different AI agent systems work together.
 """
+import re
 import autogen
 from typing import TypedDict
 
@@ -123,14 +124,13 @@ Does this triage level ({crewai_decision}) match the protocols for these symptom
         
         auditor_response = clinical_auditor.last_message()["content"]
         
-        # Parse the auditor's response
-        validated = "YES" in auditor_response.upper() and "VALIDATED: YES" in auditor_response.upper()
-        
-        confidence = "MEDIUM"
-        if "CONFIDENCE: HIGH" in auditor_response.upper():
-            confidence = "HIGH"
-        elif "CONFIDENCE: LOW" in auditor_response.upper():
-            confidence = "LOW"
+        # Parse the auditor's response strictly: only an exact
+        # "VALIDATED: YES" line counts. Anything else is not validated.
+        validated_match = re.search(r"^\s*VALIDATED:\s*(YES|NO)\s*$", auditor_response, re.IGNORECASE | re.MULTILINE)
+        validated = bool(validated_match) and validated_match.group(1).upper() == "YES"
+
+        confidence_match = re.search(r"^\s*CONFIDENCE:\s*(HIGH|MEDIUM|LOW)\s*$", auditor_response, re.IGNORECASE | re.MULTILINE)
+        confidence = confidence_match.group(1).upper() if confidence_match else "LOW"
         
         return ReviewResult(
             validated=validated,
@@ -139,12 +139,13 @@ Does this triage level ({crewai_decision}) match the protocols for these symptom
         )
         
     except Exception as e:
-        # If AutoGen review fails, return a default result
+        # A failed review must NEVER count as validated.
+        # The case goes to a human instead.
         print(f"AutoGen review error: {e}")
         return ReviewResult(
-            validated=True,
-            confidence="MEDIUM",
-            review_notes=f"AutoGen review unavailable: {str(e)[:100]}"
+            validated=False,
+            confidence="LOW",
+            review_notes=f"Review failed, needs human review: {str(e)[:100]}"
         )
 
 

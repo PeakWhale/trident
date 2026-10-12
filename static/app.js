@@ -301,13 +301,13 @@ function displayDecision(level, plan, qaReview = null) {
             qaElements.confidence.className = `qa-value ${confidence.toLowerCase()}`;
         }
     } else if (qaElements.badge) {
-        // Default to validated if no QA data (simulation)
-        qaElements.badge.textContent = 'Validated';
-        qaElements.badge.className = 'qa-badge validated';
-        if (qaElements.validated) qaElements.validated.textContent = 'Yes';
+        // No review data means the decision was NOT checked. Never show it as validated.
+        qaElements.badge.textContent = 'Needs Review';
+        qaElements.badge.className = 'qa-badge needs-review';
+        if (qaElements.validated) qaElements.validated.textContent = 'No';
         if (qaElements.confidence) {
-            qaElements.confidence.textContent = 'HIGH';
-            qaElements.confidence.className = 'qa-value high';
+            qaElements.confidence.textContent = 'LOW';
+            qaElements.confidence.className = 'qa-value low';
         }
     }
 }
