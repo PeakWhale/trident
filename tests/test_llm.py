@@ -11,7 +11,7 @@ from trident.config import Settings
 # Kept before the autouse fixture in conftest.py swaps it for a no-op.
 from trident.config import load_dotenv_if_present as REAL_LOAD_DOTENV
 from trident.engine import TriageEngine
-from trident.llm import LLMError, OllamaClient, OpenAICompatibleClient, client_from_settings
+from trident.llm import LLMError, OllamaClient, OpenAICompatibleClient, client_from_settings, redact
 
 SCHEMA = {"type": "object"}
 
@@ -43,7 +43,7 @@ def test_ollama_request_and_answer():
 
 def test_ollama_errors():
     mock, _ = transport(lambda r: httpx.Response(500, json={"error": "model not found"}))
-    with pytest.raises(httpx.HTTPStatusError):
+    with pytest.raises(LLMError, match="HTTP 500 Internal Server Error: model not found"):
         OllamaClient(transport=mock).complete("s", "u")
     mock, _ = transport(lambda r: httpx.Response(200, json={"done": True}))
     with pytest.raises(LLMError):
@@ -76,6 +76,57 @@ def test_openai_compatible_bad_answer():
     mock, _ = transport(lambda r: httpx.Response(200, json={"choices": []}))
     with pytest.raises(LLMError):
         OpenAICompatibleClient(model="m", transport=mock).complete("s", "u")
+
+
+SECRET_URLS = {
+    "openai": "https://alice:S3cretPass@llm-proxy.internal/v1",
+    "ollama": "https://alice:S3cretPass@ollama.example.com",
+}
+
+
+@pytest.mark.parametrize(
+    ("provider", "status", "body"),
+    [
+        ("openai", 401, {"error": {"message": "Unauthorized for https://alice:S3cretPass@llm-proxy.internal/v1"}}),
+        ("ollama", 404, {"error": "model 'llama3.1:8b' not found, try pulling it first"}),
+        ("openai", 500, None),
+    ],
+)
+def test_url_password_never_reaches_the_result(make_engine, provider, status, body):
+    """httpx puts the full URL, with user:password, into its error messages."""
+    mock, seen = transport(lambda r: httpx.Response(status, json=body) if body else httpx.Response(status))
+    if provider == "openai":
+        client = OpenAICompatibleClient(model="m", base_url=SECRET_URLS[provider], api_key="sk-secret-key", transport=mock)
+    else:
+        client = OllamaClient(model="llama3.1:8b", base_url=SECRET_URLS[provider], transport=mock)
+    result = make_engine(client, client).triage("The checkout page returns HTTP 503.", "it-incidents")
+
+    assert result.outcome == "NEEDS_HUMAN_REVIEW"
+    assert seen, "the mock endpoint was called"
+    assert f"HTTP {status}" in result.reasons[0]
+    dumped = json.dumps(result.model_dump(mode="json"))
+    for secret in ("S3cretPass", "alice:", "sk-secret-key"):
+        assert secret not in dumped
+    if provider == "ollama":
+        assert "try pulling it first" in result.reasons[0]
+
+
+def test_connection_error_has_no_url_password():
+    def refuse(request):
+        raise httpx.ConnectError(f"cannot connect to {request.url}", request=request)
+
+    mock, _ = transport(refuse)
+    client = OllamaClient(base_url=SECRET_URLS["ollama"], transport=mock)
+    with pytest.raises(LLMError) as info:
+        client.complete("s", "u")
+    assert "could not reach the model endpoint" in str(info.value)
+    assert "S3cretPass" not in str(info.value)
+
+
+def test_redact():
+    assert redact("for url 'https://bob:pw@host:8080/v1/chat'") == "for url 'https://***@host:8080/v1/chat'"
+    assert redact("http://host/a and bob@example.com") == "http://host/a and bob@example.com"
+    assert redact("key sk-abcd in text", ("sk-abcd", None)) == "key *** in text"
 
 
 def test_settings_defaults():

@@ -38,7 +38,7 @@ from langgraph.graph import END, START, StateGraph
 from . import DECIDED, HUMAN_REVIEW, __version__, prompts
 from .audit import AuditSink, JsonlAuditLog
 from .config import Settings
-from .llm import LLMClient, client_from_settings
+from .llm import LLMClient, client_from_settings, redact
 from .models import (
     OutputError,
     Step,
@@ -96,7 +96,8 @@ def _now() -> str:
 
 
 def _describe(exc: BaseException) -> str:
-    text = f"{type(exc).__name__}: {exc}".strip()
+    # redact(): never copy a password in a URL into reasons or the audit log.
+    text = redact(f"{type(exc).__name__}: {exc}".strip())
     return text if len(text) <= 300 else text[:297] + "..."
 
 
