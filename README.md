@@ -431,13 +431,35 @@ trident/
 - Rules moved from Python code into YAML rule packs. The engine works for any domain.
 - CrewAI, AutoGen and the mock patient database were removed. `POST /analyze` is replaced by `POST /api/triage`.
 
-## License
+## What it enables businesses to do
 
-Apache License 2.0 © 2025-2026 Aditya Rao (Addy) Kaveti. See [LICENSE](LICENSE) and [NOTICE](NOTICE). If you share or build on Trident, keep the NOTICE file. PeakWhale™ is Addy's project name; the license does not cover the name or logo.
+* **Fail-safe ticket and incident triage:** Combine LLM reading comprehension with deterministic YAML rule packs to route IT incidents, support tickets, or intake forms.
+* **Guaranteed human escalation when uncertain:** Any schema error, low confidence score, rule conflict, or QA check failure automatically routes the case to a human reviewer (`human_required: true`).
+* **Domain-agnostic rule packs:** Swap domains (IT operations, customer support, or intake screening) by editing a plain YAML file without changing application code.
 
----
+## Connect and customize
 
-<p align="center">
-  <strong>PEAKWHALE™ TRIDENT</strong><br/>
-  <sub>AI plus rules • Fail-safe by design • A person decides when in doubt</sub>
-</p>
+Want help adapting **PeakWhale™ Trident** to your own data, workflows, or infrastructure?
+
+* **Book 30 minutes:** [Schedule a working session with Addy](https://adrkv.github.io/meet.html?audience=teams)
+* **Portfolio and whitepapers:** [adrkv.github.io](https://adrkv.github.io)
+* **LinkedIn:** [Addy Kaveti](https://www.linkedin.com/in/adrkv/) · [PeakWhale™](https://www.linkedin.com/company/peakwhale%E2%84%A2/)
+
+## Part of the PeakWhale™ fleet
+
+PeakWhale™ is an open-source initiative by [Addy Kaveti](https://adrkv.github.io) making practical AI and machine learning accessible to every team:
+
+* **[PeakWhale™ Helm](https://github.com/PeakWhale/helm)**: local-first research assistant over your own SQL databases and documents, with source citations.
+* **[PeakWhale™ Orca](https://github.com/PeakWhale/orca)**: self-hosted payment fraud check that scores transactions and explains every decision in plain English.
+* **[PeakWhale™ Harbor](https://github.com/PeakWhale/harbor)**: turns any CSV spreadsheet into a prediction web app and JSON API with honest prediction ranges.
+* **[PeakWhale™ Trident](https://github.com/PeakWhale/trident)**: fail-safe triage engine pairing AI with editable YAML rule packs so unclear cases always go to a person.
+* **[PeakWhale™ Berth](https://github.com/PeakWhale/berth)**: EV depot fleet charging planner that schedules every vehicle to leave ready at the lowest power cost.
+* **[PeakWhale™ Pod](https://github.com/PeakWhale/pod)**: domain-agnostic K-means cohort and regional clustering engine with plain-English segment profiles.
+* **[PeakWhale™ Pilot](https://github.com/PeakWhale/pilot)**: outcome forecaster and early-warning engine that flags at-risk records and explains the top drivers.
+
+## Legal, trademark, and liability notice
+
+* **Open-source license:** Licensed under the **Apache License 2.0** (© 2025-2026 Aditya Rao (Addy) Kaveti). See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). If you distribute, modify, or build on this software, you must retain the [`NOTICE`](NOTICE) file as required by Section 4(d) of the Apache License 2.0.
+* **Trademark reservation:** **PeakWhale™** and the PeakWhale project marks and logos are trademarks of Aditya Rao (Addy) Kaveti. Under Section 6 of the Apache License 2.0, this license grants no permission to use the PeakWhale™ name, marks, or logos to endorse or promote derivative products or services without prior written permission.
+* **No warranty or professional advice:** This software is provided **"AS IS"**, without warranty or liability of any kind (see Sections 7 and 8 of the Apache License 2.0). Output from this tool does not constitute financial, medical, legal, compliance, or safety advice. You are solely responsible for independent validation, security controls, human oversight, and regulatory compliance before using this software in production.
+* **Independent personal project and synthetic data:** Created and maintained by Aditya Rao (Addy) Kaveti in an independent personal capacity. All bundled demo datasets are synthetic or public benchmark examples and contain no proprietary or employer material.
